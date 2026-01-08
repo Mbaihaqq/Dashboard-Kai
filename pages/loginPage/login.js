@@ -101,7 +101,7 @@ export default function Login() {
                 {/* Captcha */}
                 <div className="my-4">
                   <ReCAPTCHA 
-                    sitekey="6LeLV0QsAAAAADCUL70dQYCoh-U5-EYK1fvZyWdZ" 
+                    sitekey="6LeXeEQsAAAAAJch-ogguT2KWKDs9udnr4os6W6D" 
                     onChange={handleCaptchaChange} 
                   />
                 </div>
