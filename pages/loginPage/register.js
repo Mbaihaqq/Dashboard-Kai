@@ -3,18 +3,17 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { Eye, EyeOff } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient'; // Pastikan file ini sudah benar
+import { supabase } from '../../lib/supabaseClient';
 
 export default function Register() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   
-  // State untuk Input
-  const [email, setEmail] = useState(''); // Supabase Auth butuh Email
+  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [nip, setNip] = useState('');
-  const [position, setPosition] = useState('Staff'); // State baru untuk Jabatan
+  const [position, setPosition] = useState('Staff');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async (e) => {
@@ -22,7 +21,6 @@ export default function Register() {
     setLoading(true);
 
     try {
-      // 1. Daftarkan User ke Supabase Authenticator (auth.users)
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email,
         password: password,
@@ -30,17 +28,16 @@ export default function Register() {
 
       if (authError) throw authError;
 
-      // 2. Jika Auth berhasil, simpan data tambahan ke tabel 'profiles'
       if (authData.user) {
         const { error: profileError } = await supabase
           .from('profiles')
           .insert([
             { 
-              id: authData.user.id, // ID diambil dari akun Auth yang baru dibuat
+              id: authData.user.id, 
               username: username, 
               nip: nip, 
-              position: position, // Menyimpan jabatan yang dipilih
-              role: 'user'      // Default role
+              position: position, 
+              role: 'user'
             }
           ]);
 
@@ -58,11 +55,12 @@ export default function Register() {
   };
 
   return (
-    <div className="h-screen w-full flex overflow-hidden font-sans">
+    <div className="h-screen w-full flex overflow-hidden font-sans bg-white">
       
       {/* SEKSI KIRI: FORM */}
-      <div className="w-full md:w-1/2 bg-white flex flex-col relative">
-        <div className="flex-grow flex flex-col justify-center px-8 sm:px-16 lg:px-24">
+      <div className="w-full md:w-1/2 flex flex-col h-full overflow-y-auto">
+        {/* Kontainer Form dengan Padding Bawah agar tidak mepet garis */}
+        <div className="flex-grow flex flex-col justify-center px-8 sm:px-16 lg:px-24 py-12">
             
             <div className="flex items-center gap-4 mb-8">
               <img src="/logo-kai.png" alt="Logo KAI" className="h-10 w-auto object-contain" />
@@ -73,7 +71,6 @@ export default function Register() {
             <p className="text-gray-400 text-sm mb-8">Silahkan Masukan Data Anda untuk Autentikasi</p>
 
             <form className="space-y-4 max-w-md" onSubmit={handleRegister}>
-                {/* Email (Wajib untuk Supabase Auth) */}
                 <div>
                     <label className="block text-sm font-bold text-black mb-1.5">Email Pegawai *</label>
                     <input 
@@ -86,7 +83,6 @@ export default function Register() {
                     />
                 </div>
 
-                {/* Username */}
                 <div>
                     <label className="block text-sm font-bold text-black mb-1.5">Username *</label>
                     <input 
@@ -99,7 +95,6 @@ export default function Register() {
                     />
                 </div>
 
-                {/* Password */}
                 <div>
                     <label className="block text-sm font-bold text-black mb-1.5">Password *</label>
                     <div className="relative">
@@ -121,7 +116,6 @@ export default function Register() {
                     </div>
                 </div>
 
-                {/* Nomor Induk Pegawai */}
                 <div>
                     <label className="block text-sm font-bold text-black mb-1.5">Nomor Induk Pegawai *</label>
                     <input 
@@ -134,7 +128,6 @@ export default function Register() {
                     />
                 </div>
 
-                {/* Jabatan - Input Baru */}
                 <div>
                     <label className="block text-sm font-bold text-black mb-1.5">Jabatan *</label>
                     <select 
@@ -161,7 +154,9 @@ export default function Register() {
                 </div>
             </form>
         </div>
-        <div className="h-10 w-full bg-[#005DAA] absolute bottom-0 left-0"></div>
+        
+        {/* REVISI: Garis biru tidak lagi absolute, sehingga akan terdorong ke bawah konten */}
+        <div className="h-10 w-full bg-[#005DAA] flex-shrink-0"></div>
       </div>
 
       {/* SEKSI KANAN: GAMBAR */}
