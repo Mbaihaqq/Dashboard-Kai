@@ -14,6 +14,15 @@ export default function CreateTicket() {
   const [status, setStatus] = useState('Belum');
   const [loading, setLoading] = useState(false);
 
+  // Fungsi Validasi: Hanya angka yang diperbolehkan untuk nomor telepon
+  const handlePhoneChange = (e) => {
+    const value = e.target.value;
+    // Gunakan regex untuk memastikan hanya angka yang bisa diinput
+    if (value === '' || /^[0-9\b]+$/.test(value)) {
+      setTelepon(value);
+    }
+  };
+
   const handleSimpanTicket = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -71,7 +80,7 @@ export default function CreateTicket() {
             />
           </div>
 
-          {/* Field Telepon */}
+          {/* Field Telepon - Validasi Angka Aktif */}
           <div>
             <label className="block text-base font-bold text-black mb-2">
               Nomor Telepon Customer <span className="text-red-500">*</span>
@@ -80,7 +89,7 @@ export default function CreateTicket() {
               required
               type="text" 
               value={telepon}
-              onChange={(e) => setTelepon(e.target.value)}
+              onChange={handlePhoneChange} // Memanggil fungsi validasi angka
               placeholder="Contoh: 0812..."
               className="w-full border border-gray-400 rounded-lg px-4 py-3 focus:outline-none focus:border-[#005DAA] focus:ring-1 focus:ring-[#005DAA] transition-colors text-black"
             />

@@ -1,3 +1,4 @@
+// pages/tickets/index.js
 import { useEffect, useState } from 'react';
 import Layout from '../../components/Layout';
 import Link from 'next/link';
@@ -8,7 +9,7 @@ export default function TicketList() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false); // State untuk cek role admin
+  const [isAdmin, setIsAdmin] = useState(false); // Tetap dipertahankan sesuai kode asli Anda
 
   useEffect(() => {
     fetchTicketsAndRole();
@@ -18,7 +19,7 @@ export default function TicketList() {
     try {
       setLoading(true);
       
-      // 1. Cek Role User yang login
+      // 1. Cek Role User yang login (Sesuai kode asli Anda)
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
@@ -29,7 +30,7 @@ export default function TicketList() {
         if (profile?.role === 'admin') setIsAdmin(true);
       }
 
-      // 2. Ambil data tiket
+      // 2. Ambil data tiket (Otomatis privat karena RLS)
       const { data, error } = await supabase
         .from('tickets')
         .select('*')
@@ -44,7 +45,8 @@ export default function TicketList() {
     }
   };
 
-  // --- FUNGSI UPDATE STATUS (KHUSUS ADMIN) ---
+  // --- FUNGSI UPDATE STATUS ---
+  // Diubah agar bisa dijalankan oleh semua user untuk datanya sendiri
   const handleUpdateStatus = async (ticketId, newStatus) => {
     try {
       const { error } = await supabase
@@ -115,29 +117,19 @@ export default function TicketList() {
                     <td className="px-6 py-5 font-bold text-[#4B5563]">{ticket.email}</td>
                     <td className="px-6 py-5 flex justify-end pr-6">
                       
-                      {/* LOGIKA DROPDOWN UNTUK ADMIN ATAU LABEL BIASA UNTUK USER */}
-                      {isAdmin ? (
-                        <select
-                          value={ticket.status}
-                          onChange={(e) => handleUpdateStatus(ticket.id, e.target.value)}
-                          className={`px-2 py-1.5 rounded-md text-xs font-bold border outline-none cursor-pointer transition-colors
-                            ${ticket.status === 'Selesai' 
-                              ? 'bg-[#D1FAE5] text-[#065F46] border-[#D1FAE5]' 
-                              : 'bg-[#FEE2E2] text-[#991B1B] border-[#FEE2E2]' 
-                            }`}
-                        >
-                          <option value="Belum">Belum</option>
-                          <option value="Selesai">Selesai</option>
-                        </select>
-                      ) : (
-                        <span className={`px-4 py-1.5 rounded-md text-xs font-bold border w-24 text-center
+                      {/* DROPDOWN STATUS: Bisa diubah oleh user untuk tiketnya sendiri */}
+                      <select
+                        value={ticket.status}
+                        onChange={(e) => handleUpdateStatus(ticket.id, e.target.value)}
+                        className={`px-2 py-1.5 rounded-md text-xs font-bold border outline-none cursor-pointer transition-colors
                           ${ticket.status === 'Selesai' 
                             ? 'bg-[#D1FAE5] text-[#065F46] border-[#D1FAE5]' 
                             : 'bg-[#FEE2E2] text-[#991B1B] border-[#FEE2E2]' 
-                          }`}>
-                          {ticket.status}
-                        </span>
-                      )}
+                          }`}
+                      >
+                        <option value="Belum">Belum</option>
+                        <option value="Selesai">Selesai</option>
+                      </select>
 
                     </td>
                   </tr>
