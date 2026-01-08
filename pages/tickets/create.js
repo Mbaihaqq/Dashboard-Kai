@@ -14,10 +14,18 @@ export default function CreateTicket() {
   const [status, setStatus] = useState('Belum');
   const [loading, setLoading] = useState(false);
 
+  // Fungsi Validasi: Nama hanya boleh HURUF dan SPASI
+  const handleNamaChange = (e) => {
+    const value = e.target.value;
+    // Regex mengizinkan huruf a-z, A-Z, dan spasi
+    if (value === '' || /^[a-zA-Z\s]*$/.test(value)) {
+      setNama(value);
+    }
+  };
+
   // Fungsi Validasi: Hanya angka yang diperbolehkan untuk nomor telepon
   const handlePhoneChange = (e) => {
     const value = e.target.value;
-    // Gunakan regex untuk memastikan hanya angka yang bisa diinput
     if (value === '' || /^[0-9\b]+$/.test(value)) {
       setTelepon(value);
     }
@@ -65,7 +73,7 @@ export default function CreateTicket() {
 
         <form className="space-y-6" onSubmit={handleSimpanTicket}>
           
-          {/* Field Nama */}
+          {/* Field Nama - Validasi Huruf Aktif */}
           <div>
             <label className="block text-base font-bold text-black mb-2">
               Nama Customer <span className="text-red-500">*</span>
@@ -74,8 +82,8 @@ export default function CreateTicket() {
               required
               type="text" 
               value={nama}
-              onChange={(e) => setNama(e.target.value)}
-              placeholder="Masukkan nama..."
+              onChange={handleNamaChange}
+              placeholder="Masukkan nama (hanya huruf)..."
               className="w-full border border-gray-400 rounded-lg px-4 py-3 focus:outline-none focus:border-[#005DAA] focus:ring-1 focus:ring-[#005DAA] transition-colors text-black" 
             />
           </div>
@@ -89,7 +97,7 @@ export default function CreateTicket() {
               required
               type="text" 
               value={telepon}
-              onChange={handlePhoneChange} // Memanggil fungsi validasi angka
+              onChange={handlePhoneChange} 
               placeholder="Contoh: 0812..."
               className="w-full border border-gray-400 rounded-lg px-4 py-3 focus:outline-none focus:border-[#005DAA] focus:ring-1 focus:ring-[#005DAA] transition-colors text-black"
             />
@@ -125,7 +133,6 @@ export default function CreateTicket() {
             </select>
           </div>
 
-          {/* Tombol Action */}
           <div className="pt-8 flex justify-center gap-4">
              <Link href="/tickets">
                 <button 

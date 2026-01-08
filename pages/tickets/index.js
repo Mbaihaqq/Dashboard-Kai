@@ -9,7 +9,7 @@ export default function TicketList() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false); // Tetap dipertahankan sesuai kode asli Anda
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     fetchTicketsAndRole();
@@ -19,7 +19,6 @@ export default function TicketList() {
     try {
       setLoading(true);
       
-      // 1. Cek Role User yang login (Sesuai kode asli Anda)
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
@@ -30,7 +29,6 @@ export default function TicketList() {
         if (profile?.role === 'admin') setIsAdmin(true);
       }
 
-      // 2. Ambil data tiket (Otomatis privat karena RLS)
       const { data, error } = await supabase
         .from('tickets')
         .select('*')
@@ -45,8 +43,6 @@ export default function TicketList() {
     }
   };
 
-  // --- FUNGSI UPDATE STATUS ---
-  // Diubah agar bisa dijalankan oleh semua user untuk datanya sendiri
   const handleUpdateStatus = async (ticketId, newStatus) => {
     try {
       const { error } = await supabase
@@ -56,16 +52,21 @@ export default function TicketList() {
 
       if (error) throw error;
       
-      // Update state lokal agar tampilan berubah otomatis
       setTickets(tickets.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
     } catch (error) {
       alert("Gagal mengubah status: " + error.message);
     }
   };
 
-  const filteredTickets = tickets.filter((ticket) =>
-    ticket.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Logika Filter: Cari berdasarkan Nama, Nomor Telepon, atau Email
+  const filteredTickets = tickets.filter((ticket) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      ticket.customer_name?.toLowerCase().includes(term) ||
+      ticket.phone_number?.toLowerCase().includes(term) ||
+      ticket.email?.toLowerCase().includes(term)
+    );
+  });
 
   return (
     <Layout>
@@ -88,7 +89,7 @@ export default function TicketList() {
              </span>
              <input 
                type="text" 
-               placeholder="Search" 
+               placeholder="Cari nama, telp, atau email..." 
                value={searchTerm}
                onChange={(e) => setSearchTerm(e.target.value)}
                className="bg-[#F9FAFB] border-none text-[#4B5563] text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2.5" 
@@ -117,7 +118,6 @@ export default function TicketList() {
                     <td className="px-6 py-5 font-bold text-[#4B5563]">{ticket.email}</td>
                     <td className="px-6 py-5 flex justify-end pr-6">
                       
-                      {/* DROPDOWN STATUS: Bisa diubah oleh user untuk tiketnya sendiri */}
                       <select
                         value={ticket.status}
                         onChange={(e) => handleUpdateStatus(ticket.id, e.target.value)}

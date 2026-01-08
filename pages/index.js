@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { supabase } from '../lib/supabaseClient'; //
+import { supabase } from '../lib/supabaseClient'; 
 
 export default function Dashboard() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function Dashboard() {
       if (revError) throw revError;
 
       const formattedRev = revData.map((item) => ({
-        day: item.date.split('-')[2], // Ambil angka tanggalnya saja
+        day: item.date.split('-')[2], 
         target: item.target_revenue,
         actual: item.actual_revenue
       }));
@@ -75,15 +75,15 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <h1 className="text-2xl font-bold text-black mb-1">Dashboard</h1>
-      <p className="text-sm text-gray-500 mb-8">Target Pendapatan & Data Aktual Lapangan (Real-time)</p>
+      <h1 className="text-2xl font-bold text-black mb-1 font-sans">Dashboard</h1>
+      <p className="text-sm text-gray-500 mb-8 font-sans">Target Pendapatan & Data Aktual Lapangan (Real-time)</p>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
         
         {/* --- KIRI: GRAFIK BATANG (Bar Chart) --- */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
           <div className="flex justify-between items-center mb-6">
-             <h2 className="text-sm font-semibold text-gray-400">10 Data Terakhir Database</h2>
+              <h2 className="text-sm font-semibold text-gray-400">10 Data Terakhir Database</h2>
           </div>
           
           <div className="h-72 w-full">
@@ -98,29 +98,31 @@ export default function Dashboard() {
                 />
                 <Tooltip 
                   cursor={{fill: 'transparent'}} 
-                  contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
+                  contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
                 />
                 <Bar dataKey="target" fill="#5865F2" radius={[4, 4, 0, 0]} barSize={10} /> 
-                <Bar dataKey="actual" fill="#E5E7EB" radius={[4, 4, 0, 0]} barSize={10} /> 
+                {/* REVISI WARNA ORANYE: #F26522 */}
+                <Bar dataKey="actual" fill="#F26522" radius={[4, 4, 0, 0]} barSize={10} /> 
               </BarChart>
             </ResponsiveContainer>
           </div>
           
-          <div className="flex gap-6 mt-6 text-xs text-gray-500">
+          <div className="flex gap-6 mt-6 text-xs text-gray-500 font-medium">
             <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-[#5865F2]"></span> Target Pendapatan
             </div>
+            {/* REVISI WARNA LEGENDA: #F26522 */}
             <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-gray-200"></span> Pendapatan Aktual
+                <span className="w-3 h-3 rounded-full bg-[#F26522]"></span> Pendapatan Aktual
             </div>
           </div>
         </div>
 
         {/* --- KANAN: GRAFIK DONUT (Pie Chart) --- */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between min-h-[300px]">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between min-h-[300px] transition-all hover:shadow-md">
           <div>
             <h2 className="text-sm font-semibold text-gray-800 mb-1">Penyelesaian Permasalahan Tiket</h2>
-            <p className="text-xs text-gray-400">Data Real dari Tabel Tiket</p>
+            <p className="text-xs text-gray-400 font-medium">Data Real dari Tabel Tiket</p>
           </div>
 
           <div className="h-48 w-full relative my-4 flex items-center justify-center">
@@ -143,17 +145,16 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
             
-            {/* Teks Persentase Dinamis di Tengah Donut */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className="text-3xl font-bold text-[#8b9af9]">{percentSelesai}%</span>
             </div>
           </div>
 
-          <div className="flex justify-between px-2 text-xs font-medium mt-auto">
+          <div className="flex justify-between px-2 text-xs font-bold mt-auto border-t border-gray-50 pt-4">
              <div className="flex flex-col items-center gap-1">
                 <div className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-[#8b9af9]"></span>
-                  <span className="text-gray-500">Selesai</span>
+                  <span className="text-gray-400 font-semibold">Selesai</span>
                 </div>
                 <span className="text-black font-bold ml-3">
                   {dataTickets.find(t => t.name === 'Selesai')?.value || 0} Tiket
@@ -162,7 +163,7 @@ export default function Dashboard() {
              <div className="flex flex-col items-center gap-1">
                 <div className="flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-[#e0e7ff]"></span>
-                  <span className="text-gray-500">Belum/On Progress</span>
+                  <span className="text-gray-400 font-semibold">Belum/On Progress</span>
                 </div>
                 <span className="text-black font-bold ml-3">
                   {dataTickets.find(t => t.name === 'On Progress')?.value || 0} Tiket
@@ -170,7 +171,6 @@ export default function Dashboard() {
              </div>
           </div>
         </div>
-
       </div>
     </Layout>
   );
