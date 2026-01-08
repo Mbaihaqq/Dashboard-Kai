@@ -2,16 +2,19 @@ import { useEffect, useState } from 'react';
 import Layout from '../../components/Layout';
 import { supabase } from '../../lib/supabaseClient';
 import Cropper from 'react-easy-crop';
-import { Camera, X } from 'lucide-react';
+import { Camera, X, CheckCircle } from 'lucide-react';
 
 export default function Profile() {
-  const [userData, setUserData] = useState({ id: '', username: '', nip: '', position: '', email: '', avatar_url: '' });
+  const [userData, setUserData] = useState({ 
+    id: '', username: '', nip: '', position: '', email: '', avatar_url: '', role: '', status: '' 
+  });
   const [image, setImage] = useState(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [showCropper, setShowCropper] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false); // State untuk View Foto Besar
+  const [showViewModal, setShowViewModal] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -20,10 +23,35 @@ export default function Profile() {
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      // Pastikan kolom 'role' dan 'status' terpanggil dari tabel profiles
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
       if (!error && data) {
         setUserData({ ...data, email: user.email });
       }
+    }
+  };
+
+  // FUNGSI KHUSUS ADMIN: Update status ke Supabase
+  const handleUpdateStatus = async (newStatus) => {
+    setIsSavingStatus(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ status: newStatus })
+        .eq('id', userData.id);
+
+      if (error) throw error;
+      setUserData({ ...userData, status: newStatus });
+      alert("Status berhasil diperbarui!");
+    } catch (error) {
+      alert("Gagal update status: " + error.message);
+    } finally {
+      setIsSavingStatus(false);
     }
   };
 
@@ -82,7 +110,7 @@ export default function Profile() {
           {/* FOTO PROFIL CONTAINER */}
           <div className="relative group w-24 h-24">
             <div 
-              onClick={() => setShowViewModal(true)} // Klik untuk View Foto
+              onClick={() => setShowViewModal(true)} 
               className="w-24 h-24 bg-gray-100 rounded-full overflow-hidden border-2 border-gray-100 shadow-sm cursor-pointer"
             >
               <img 
@@ -92,7 +120,6 @@ export default function Profile() {
               />
             </div>
             
-            {/* Overlay Ikon Kamera (Hanya muncul saat hover) untuk Ubah Foto */}
             <label className="absolute bottom-0 right-0 bg-[#005DAA] p-1.5 rounded-full border-2 border-white cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
               <Camera className="text-white" size={16} />
               <input id="avatar-upload" type="file" className="hidden" accept="image/*" onChange={onFileChange} />
@@ -101,30 +128,29 @@ export default function Profile() {
 
           <div>
             <h2 className="text-2xl font-bold text-[#4B5563]">{userData.username || 'baihaqi'}</h2>
-            <p className="text-gray-500">{userData.email || 'baihaqi@kai.id'}</p>
+            <div className="flex items-center gap-2">
+                <p className="text-gray-500">{userData.email || 'baihaqi@kai.id'}</p>
+                {/* Badge Role */}
+                <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+                    {userData.role || 'Pegawai'}
+                </span>
+            </div>
           </div>
         </div>
 
-        {/* MODAL 1: VIEW PROFILE PHOTO (Lightbox) */}
+        {/* MODAL 1: VIEW PHOTO */}
         {showViewModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 animate-fadeIn">
-             <button 
-                onClick={() => setShowViewModal(false)}
-                className="absolute top-6 right-6 text-white hover:text-gray-300"
-              >
+             <button onClick={() => setShowViewModal(false)} className="absolute top-6 right-6 text-white hover:text-gray-300">
                 <X size={40} />
               </button>
               <div className="max-w-xl w-full flex justify-center">
-                  <img 
-                    src={userData.avatar_url || "/avatar-placeholder.png"} 
-                    className="max-h-[80vh] rounded-lg shadow-2xl border-4 border-white"
-                    alt="View Profile" 
-                  />
+                  <img src={userData.avatar_url || "/avatar-placeholder.png"} className="max-h-[80vh] rounded-lg shadow-2xl border-4 border-white" alt="View Profile" />
               </div>
           </div>
         )}
 
-        {/* MODAL 2: CROP PHOTO (Hanya muncul saat pilih file baru) */}
+        {/* MODAL 2: CROP PHOTO */}
         {showCropper && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
             <div className="bg-white rounded-xl p-6 w-full max-w-lg">
@@ -142,12 +168,35 @@ export default function Profile() {
           </div>
         )}
 
-        {/* FORM DATA READ-ONLY */}
+        {/* FORM DATA READ-ONLY & EDITABLE STATUS */}
         <div className="space-y-6 max-w-md"> 
           <div>
             <label className="block text-gray-600 mb-2 font-medium">Username</label>
             <input readOnly value={userData.username} className="w-full border border-gray-200 rounded-lg p-3 bg-white text-[#4B5563] font-bold focus:outline-none shadow-sm" />
           </div>
+
+          {/* STATUS AKUN: Editable jika Admin */}
+          <div>
+            <label className="block text-gray-600 mb-2 font-medium">Status Akun</label>
+            {userData.role === 'admin' ? (
+              <select 
+                value={userData.status || 'Aktif'} 
+                onChange={(e) => handleUpdateStatus(e.target.value)}
+                disabled={isSavingStatus}
+                className="w-full border border-gray-300 rounded-lg p-3 bg-white text-[#005DAA] font-bold focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer shadow-sm"
+              >
+                <option value="Aktif">Aktif</option>
+                <option value="Nonaktif">Nonaktif</option>
+                <option value="Suspend">Suspend</option>
+              </select>
+            ) : (
+              <div className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <CheckCircle size={18} className={userData.status === 'Aktif' ? "text-green-500" : "text-red-500"} />
+                <span className="font-bold text-[#4B5563]">{userData.status || 'Aktif'}</span>
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="block text-gray-600 mb-2 font-medium">Nomor Induk Pegawai</label>
             <input readOnly value={userData.nip} className="w-full border border-gray-200 rounded-lg p-3 bg-white text-[#4B5563] font-bold focus:outline-none shadow-sm" />
