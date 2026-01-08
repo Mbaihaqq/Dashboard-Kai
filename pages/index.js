@@ -93,7 +93,7 @@ export default function Dashboard() {
                   dataKey="day" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{fontSize: 12, fill: '#9CA3AF'}} 
+                  tick={{fontSize: 12, fill: '#3d4148ff'}} 
                   dy={10}
                 />
                 <Tooltip 
