@@ -1,3 +1,4 @@
+// pages/target/index.js
 import { useEffect, useState } from 'react';
 import Layout from '../../components/Layout';
 import Link from 'next/link';
@@ -12,6 +13,7 @@ export default function TargetRevenue() {
   const fetchTargets = async () => {
     try {
       setLoading(true);
+      // Supabase otomatis hanya mengambil data milik user yang login karena RLS aktif
       const { data, error } = await supabase
         .from('daily_targets')
         .select('*')
@@ -86,6 +88,7 @@ export default function TargetRevenue() {
         </div>
 
         <div className="w-full">
+            {/* Header Tabel */}
             <div className="bg-[#005DAA] text-white p-4 rounded-lg shadow-sm grid grid-cols-12 gap-4 items-center font-bold text-sm md:text-base text-center">
                 <div className="col-span-1">NO</div>
                 <div className="col-span-3 text-center md:text-left">Tanggal</div>
@@ -94,6 +97,7 @@ export default function TargetRevenue() {
                 <div className="col-span-1 text-center">Aksi</div>
             </div>
 
+            {/* List Data */}
             <div className="space-y-3 mt-3">
                 {loading ? (
                     <p className="text-center py-10 text-[#4B5563] font-bold">Memuat data...</p>
@@ -103,7 +107,6 @@ export default function TargetRevenue() {
                             key={item.id} 
                             className="bg-white border border-[#005DAA] rounded-lg p-4 grid grid-cols-12 gap-4 items-center shadow-sm hover:shadow-md transition-shadow text-center"
                         >
-                            {/* Warna teks diubah menjadi #4B5563 (Abu-abu Medium) */}
                             <div className="col-span-1 font-bold text-[#4B5563]">{index + 1}</div>
                             <div className="col-span-3 text-[#4B5563] font-bold text-center md:text-left">
                                 {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}

@@ -3,12 +3,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../../components/Layout';
 import Link from 'next/link';
-import { supabase } from '../../lib/supabaseClient'; //
+import { supabase } from '../../lib/supabaseClient';
 
 export default function CreateTicket() {
   const router = useRouter();
   
-  // State sesuai tabel tickets
   const [nama, setNama] = useState('');
   const [telepon, setTelepon] = useState('');
   const [email, setEmail] = useState('');
@@ -20,14 +19,20 @@ export default function CreateTicket() {
     setLoading(true);
 
     try {
+      // 1. Ambil info user yang sedang login
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
+      // 2. Simpan data ke tabel tickets
       const { error } = await supabase
-        .from('tickets') //
+        .from('tickets')
         .insert([
           { 
             customer_name: nama, 
             phone_number: telepon, 
             email: email, 
-            status: status 
+            status: status,
+            user_id: user.id // Menandai bahwa tiket ini milik user yang sedang login
           }
         ]);
 
@@ -44,7 +49,6 @@ export default function CreateTicket() {
 
   return (
     <Layout>
-      {/* REVISI: Gunakan 'w-full max-w-5xl' agar lebar input konsisten dengan halaman Target Input */}
       <div className="w-full max-w-5xl">
         
         <h1 className="text-3xl font-bold text-black mb-1">Permasalahan Tiket</h1>
@@ -112,10 +116,8 @@ export default function CreateTicket() {
             </select>
           </div>
 
-          {/* Tombol Action (Center Relative to Input Width) */}
+          {/* Tombol Action */}
           <div className="pt-8 flex justify-center gap-4">
-            
-            {/* Tombol Batal */}
              <Link href="/tickets">
                 <button 
                   type="button" 
@@ -125,7 +127,6 @@ export default function CreateTicket() {
                 </button>
              </Link>
 
-            {/* Tombol Simpan */}
             <button 
                 type="submit" 
                 disabled={loading}

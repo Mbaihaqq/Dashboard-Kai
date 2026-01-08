@@ -16,13 +16,11 @@ export default function InputTarget() {
   // Fungsi Format: Menambahkan "Rp " di depan angka secara otomatis
   const formatRupiah = (value) => {
     if (!value) return '';
-    // Ambil angka saja
     const numberString = value.replace(/[^0-9]/g, '');
     if (!numberString) return '';
     
-    // Format ribuan dengan titik
     const formatted = numberString.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-    return `Rp ${formatted}`; // Gabungkan Rp dan angka agar sejajar
+    return `Rp ${formatted}`; 
   };
 
   // Fungsi untuk membersihkan semua karakter kecuali angka sebelum simpan ke database
@@ -43,13 +41,19 @@ export default function InputTarget() {
     setLoading(true);
 
     try {
+      // 1. Ambil info user yang sedang login
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+
+      // 2. Simpan data ke tabel daily_targets
       const { error } = await supabase
         .from('daily_targets')
         .insert([
           { 
             date: date, 
             target_revenue: valTarget, 
-            actual_revenue: valActual 
+            actual_revenue: valActual,
+            user_id: user.id // Menandai bahwa data ini milik user yang sedang login
           }
         ]);
 
@@ -91,7 +95,7 @@ export default function InputTarget() {
                 />
             </div>
 
-            {/* Input Target Pendapatan Sejajar */}
+            {/* Input Target Pendapatan */}
             <div>
                 <label className="block text-base font-bold text-black mb-2">
                     Target Pendapatan <span className="text-red-500">*</span>
@@ -106,7 +110,7 @@ export default function InputTarget() {
                 />
             </div>
 
-            {/* Input Pendapatan Aktual Sejajar */}
+            {/* Input Pendapatan Aktual */}
             <div>
                 <label className="block text-base font-bold text-black mb-2">
                     Pendapatan Aktual <span className="text-red-500">*</span>
@@ -140,9 +144,7 @@ export default function InputTarget() {
                     {loading ? "Memproses..." : "Simpan Data"}
                 </button>
             </div>
-
         </form>
-
       </div>
     </Layout>
   );
