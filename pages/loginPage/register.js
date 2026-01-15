@@ -47,7 +47,7 @@ export default function Register() {
             { 
               id: userId, 
               username: username.trim(), 
-              nip: nip.trim(), // Memastikan NIP masuk
+              nip: nip.trim(), // memastikan NIP masuk
               position: position, 
               role: 'user'
             },
@@ -61,7 +61,7 @@ export default function Register() {
       }
 
       alert("Registrasi Berhasil! Username, NIP, dan Jabatan telah terdaftar.");
-      router.push('/loginPage/login');
+      router.push('/loginPage/login'); 
       
     } catch (error) {
       alert("Gagal Daftar: " + error.message);
