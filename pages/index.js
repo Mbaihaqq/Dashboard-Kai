@@ -1,177 +1,148 @@
-// pages/index.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { supabase } from '../lib/supabaseClient'; 
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { supabase } from '../lib/supabaseClient';
 
 export default function Dashboard() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
-  
-  // --- STATE DATA DARI DATABASE ---
-  const [dataRevenue, setDataRevenue] = useState([]);
-  const [dataTickets, setDataTickets] = useState([]);
-  const [percentSelesai, setPercentSelesai] = useState(0);
+  const [unitsData, setUnitsData] = useState([]);
+  const [summary, setSummary] = useState({ new: 0, open: 0, progress: 0, closed: 0 });
 
   useEffect(() => {
     const loggedIn = sessionStorage.getItem('isLoggedIn');
-    
     if (!loggedIn) {
       router.push('/loginPage/login');
     } else {
       setIsAuthorized(true);
-      fetchAllData();
+      fetchHazardStatistics();
     }
   }, [router]);
 
-  // --- FUNGSI AMBIL SEMUA DATA ---
-  const fetchAllData = async () => {
+  const fetchHazardStatistics = async () => {
     try {
-      // 1. Ambil Data Target Pendapatan
-      const { data: revData, error: revError } = await supabase
-        .from('daily_targets')
-        .select('date, target_revenue, actual_revenue')
-        .order('date', { ascending: true })
-        .limit(10);
+      // Menarik data terbaru dari tabel hazards [cite: 52]
+      const { data, error } = await supabase.from('hazards').select('*');
+      if (error) throw error;
 
-      if (revError) throw revError;
+      if (!data || data.length === 0) return;
 
-      const formattedRev = revData.map((item) => ({
-        day: item.date.split('-')[2], 
-        target: item.target_revenue,
-        actual: item.actual_revenue
-      }));
-      setDataRevenue(formattedRev);
+      // 1. Hitung Card Ringkasan (Top Summary) sesuai desain PDF
+      setSummary({
+        new: data.filter(d => d.status === 'Open').length,
+        open: data.filter(d => d.status === 'Open').length,
+        progress: data.filter(d => d.status === 'Work In Progress').length,
+        closed: data.filter(d => d.status === 'Closed').length
+      });
 
-      // 2. Ambil Data Tiket untuk Donut Chart
-      const { data: ticketData, error: ticketError } = await supabase
-        .from('tickets')
-        .select('status');
+      // 2. Daftar Unit Resmi dari Template KAI
+      const targetUnits = [
+        'Operasi', 'Jalan Rel dan Jembatan', 'Bangunan', 
+        'IT', 'Sinyal & Telekomunikasi', 'Sarana',
+        'SDM', 'Kesehatan', 'Pengamanan'
+      ];
 
-      if (ticketError) throw ticketError;
+      const formattedUnits = targetUnits.map(unitName => {
+        const unitItems = data.filter(d => d.unit === unitName);
+        const total = unitItems.length;
+        const closed = unitItems.filter(d => d.status === 'Closed').length;
+        const progress = unitItems.filter(d => d.status === 'Work In Progress').length;
+        const open = unitItems.filter(d => d.status === 'Open').length;
+        
+        // Hitung TL% (Persentase Penyelesaian)
+        const completion = total > 0 ? Math.round((closed / total) * 100) : 0;
 
-      const total = ticketData.length;
-      const selesai = ticketData.filter(t => t.status === 'Selesai').length;
-      const onProgress = total - selesai;
+        return {
+          name: unitName,
+          total,
+          completion,
+          chartData: [
+            { name: 'Closed', value: closed, color: '#22c55e' }, // Hijau
+            { name: 'Progress', value: progress, color: '#F26522' }, // Oranye KAI
+            { name: 'Open', value: open, color: '#ef4444' } // Merah
+          ]
+        };
+      });
 
-      // Hitung persentase untuk teks di tengah donut
-      const percentage = total > 0 ? Math.round((selesai / total) * 100) : 0;
-      setPercentSelesai(percentage);
-
-      setDataTickets([
-        { name: 'Selesai', value: selesai, color: '#8b9af9' },
-        { name: 'On Progress', value: onProgress, color: '#e0e7ff' }
-      ]);
-
+      setUnitsData(formattedUnits);
     } catch (error) {
-      console.error("Gagal sinkronisasi data:", error.message);
+      console.error("Gagal sinkronisasi dashboard:", error.message);
     }
   };
 
-  if (!isAuthorized) {
-    return <div className="h-screen bg-white"></div>;
-  }
+  if (!isAuthorized) return <div className="h-screen bg-white"></div>;
 
   return (
     <Layout>
-      <h1 className="text-2xl font-bold text-black mb-1 font-sans">Dashboard</h1>
-      <p className="text-sm text-gray-500 mb-8 font-sans">Target Pendapatan & Data Aktual Lapangan (Real-time)</p>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
-        
-        {/* --- KIRI: GRAFIK BATANG (Bar Chart) --- */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
-          <div className="flex justify-between items-center mb-6">
-              <h2 className="text-sm font-semibold text-gray-400">10 Data Terakhir Database</h2>
-          </div>
-          
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dataRevenue} barGap={8}>
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 12, fill: '#3d4148ff'}} 
-                  dy={10}
-                />
-                <Tooltip 
-                  cursor={{fill: 'transparent'}} 
-                  contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} 
-                />
-                <Bar dataKey="target" fill="#5865F2" radius={[4, 4, 0, 0]} barSize={10} /> 
-                {/* REVISI WARNA ORANYE: #F26522 */}
-                <Bar dataKey="actual" fill="#F26522" radius={[4, 4, 0, 0]} barSize={10} /> 
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          
-          <div className="flex gap-6 mt-6 text-xs text-gray-500 font-medium">
-            <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-[#5865F2]"></span> Target Pendapatan
-            </div>
-            {/* REVISI WARNA LEGENDA: #F26522 */}
-            <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-[#F26522]"></span> Pendapatan Aktual
-            </div>
-          </div>
+      {/* HEADER DASHBOARD */}
+      <div className="mb-8 flex justify-between items-center border-b pb-4">
+        <div>
+          <h1 className="text-2xl font-black text-[#005DAA] uppercase">Hazard Report</h1>
+          <p className="text-sm text-gray-400 font-bold">DAOP 4 SEMARANG MONITORING SYSTEM</p>
         </div>
-
-        {/* --- KANAN: GRAFIK DONUT (Pie Chart) --- */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between min-h-[300px] transition-all hover:shadow-md">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-800 mb-1">Penyelesaian Permasalahan Tiket</h2>
-            <p className="text-xs text-gray-400 font-medium">Data Real dari Tabel Tiket</p>
-          </div>
-
-          <div className="h-48 w-full relative my-4 flex items-center justify-center">
-             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie 
-                  data={dataTickets} 
-                  innerRadius={60} 
-                  outerRadius={80} 
-                  startAngle={90}
-                  endAngle={-270}
-                  paddingAngle={0} 
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {dataTickets.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span className="text-3xl font-bold text-[#8b9af9]">{percentSelesai}%</span>
-            </div>
-          </div>
-
-          <div className="flex justify-between px-2 text-xs font-bold mt-auto border-t border-gray-50 pt-4">
-             <div className="flex flex-col items-center gap-1">
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#8b9af9]"></span>
-                  <span className="text-gray-400 font-semibold">Selesai</span>
-                </div>
-                <span className="text-black font-bold ml-3">
-                  {dataTickets.find(t => t.name === 'Selesai')?.value || 0} Tiket
-                </span>
-             </div>
-             <div className="flex flex-col items-center gap-1">
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#e0e7ff]"></span>
-                  <span className="text-gray-400 font-semibold">Belum/On Progress</span>
-                </div>
-                <span className="text-black font-bold ml-3">
-                  {dataTickets.find(t => t.name === 'On Progress')?.value || 0} Tiket
-                </span>
-             </div>
-          </div>
+        <div className="bg-gray-100 px-4 py-2 rounded-xl text-right">
+          <p className="text-[10px] font-black text-gray-400 uppercase">Status Data</p>
+          <p className="text-sm font-bold text-[#F26522]">Real-time Database</p>
         </div>
       </div>
+
+      {/* 4 CARD RINGKASAN ATAS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <StatCard title="New Hazard" value={summary.new} color="bg-pink-100 text-pink-600 border-pink-200" />
+        <StatCard title="Open Hazard" value={summary.open} color="bg-orange-100 text-orange-600 border-orange-200" />
+        <StatCard title="In Progress" value={summary.progress} color="bg-purple-100 text-purple-600 border-purple-200" />
+        <StatCard title="Closed" value={summary.closed} color="bg-green-100 text-green-600 border-green-200" />
+      </div>
+
+      {/* GRID GRAFIK PER UNIT */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {unitsData.map((unit, idx) => (
+          <div key={idx} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-lg transition-all">
+            <h3 className="text-sm font-black text-[#005DAA] mb-4 self-start uppercase italic">Unit {unit.name}</h3>
+            
+            <div className="relative w-44 h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={unit.chartData}
+                    innerRadius={55}
+                    outerRadius={75}
+                    paddingAngle={2}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {unit.chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-black text-gray-800">{unit.completion}%</span>
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">TL%</span>
+              </div>
+            </div>
+
+            {/* LEGENDA DATA SESUAI PDF */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 mt-6 w-full text-[10px] font-black text-gray-500 uppercase">
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500"></span> Open: {unit.chartData[2].value}</div>
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-[#F26522]"></span> Progress: {unit.chartData[1].value}</div>
+              <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500"></span> Closed: {unit.chartData[0].value}</div>
+              <div className="flex items-center gap-2 border-l pl-2 border-gray-200"><span className="w-2 h-2 rounded-full bg-blue-900"></span> Total: {unit.total}</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </Layout>
+  );
+}
+
+function StatCard({ title, value, color }) {
+  return (
+    <div className={`${color} p-5 rounded-3xl border flex flex-col items-center shadow-sm`}>
+      <span className="text-4xl font-black mb-1">{value}</span>
+      <span className="text-[10px] font-black uppercase tracking-widest opacity-70">{title}</span>
+    </div>
   );
 }
