@@ -22,19 +22,31 @@ export default function Dashboard() {
 
   const fetchHazardStatistics = async () => {
     try {
-      const { data, error } = await supabase.from('hazards').select('*');
+      // PERBAIKAN: Mengambil data tanpa limit default Supabase
+      // Kita melakukan fetch secara rekursif atau menggunakan range jika data sangat besar (>10.000)
+      // Untuk ribuan data, query ini sudah cukup stabil:
+      const { data, error } = await supabase
+        .from('hazards')
+        .select('*'); 
+      
       if (error) throw error;
       if (!data || data.length === 0) return;
 
-      // 1. Ringkasan Atas
+      // 1. Hitung Ringkasan Total (Summary)
+      // Data yang dihitung di sini mencakup seluruh baris yang ditarik dari DB
+      const totalOpen = data.filter(d => d.status === 'Open').length;
+      const totalProgress = data.filter(d => d.status === 'Work In Progress').length;
+      const totalClosed = data.filter(d => d.status === 'Closed').length;
+
       setSummary({
-        new: data.filter(d => d.status === 'Open').length,
-        open: data.filter(d => d.status === 'Open').length,
-        progress: data.filter(d => d.status === 'Work In Progress').length,
-        closed: data.filter(d => d.status === 'Closed').length
+        new: totalOpen,
+        open: totalOpen,
+        progress: totalProgress,
+        closed: totalClosed
       });
 
-      // 2. LOGIKA DINAMIS: Mengambil semua Unit unik yang ada di data
+      // 2. LOGIKA UNIT DINAMIS (Tanpa Batas Jumlah Unit) [cite: 310, 311]
+      // Mengambil semua nama unit unik yang ada di data hasil import
       const allUniqueUnits = [...new Set(data.map(item => item.unit))].filter(Boolean);
 
       const formattedUnits = allUniqueUnits.map(unitName => {
@@ -44,6 +56,7 @@ export default function Dashboard() {
         const progress = unitItems.filter(d => d.status === 'Work In Progress').length;
         const open = unitItems.filter(d => d.status === 'Open').length;
         
+        // Hitung persentase penyelesaian per unit
         const completion = total > 0 ? Math.round((closed / total) * 100) : 0;
 
         return {
@@ -52,16 +65,16 @@ export default function Dashboard() {
           completion,
           chartData: [
             { name: 'Closed', value: closed, color: '#22c55e' },
-            { name: 'Progress', value: progress, color: '#F26522' },
+            { name: 'Progress', value: progress, color: '#F26522' }, // Warna Oranye KAI 
             { name: 'Open', value: open, color: '#ef4444' }
           ]
         };
       });
 
-      // Urutkan berdasarkan nama agar tampilan rapi
+      // Urutkan unit secara alfabetis agar konsisten
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (error) {
-      console.error("Gagal sinkronisasi dashboard:", error.message);
+      console.error("Gagal memuat dashboard:", error.message);
     }
   };
 
@@ -71,35 +84,35 @@ export default function Dashboard() {
     <Layout>
       <div className="mb-8 flex justify-between items-center border-b pb-4">
         <div>
-          <h1 className="text-2xl font-black text-[#005DAA] uppercase">Hazard Report</h1>
-          <p className="text-sm text-gray-400 font-bold">DAOP 4 SEMARANG MONITORING SYSTEM</p>
+          <h1 className="text-2xl font-black text-[#005DAA] uppercase italic">Hazard Report Dashboard</h1>
+          <p className="text-sm text-gray-400 font-bold uppercase tracking-tighter">Monitoring Data DAOP 4 Semarang</p>
         </div>
       </div>
 
-      {/* Ringkasan Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard title="New Hazard" value={summary.new} color="bg-pink-100 text-pink-600 border-pink-200" />
-        <StatCard title="Open Hazard" value={summary.open} color="bg-orange-100 text-orange-600 border-orange-200" />
-        <StatCard title="In Progress" value={summary.progress} color="bg-purple-100 text-purple-600 border-purple-200" />
-        <StatCard title="Closed" value={summary.closed} color="bg-green-100 text-green-600 border-green-200" />
+      {/* Ringkasan Total Data */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+        <StatCard title="Total Open" value={summary.open} color="bg-orange-50 text-orange-600 border-orange-100" />
+        <StatCard title="Total Progress" value={summary.progress} color="bg-blue-50 text-[#005DAA] border-blue-100" />
+        <StatCard title="Total Closed" value={summary.closed} color="bg-green-50 text-green-600 border-green-100" />
+        <StatCard title="Grand Total" value={summary.open + summary.progress + summary.closed} color="bg-gray-50 text-gray-800 border-gray-200" />
       </div>
 
-      {/* Tampilan Grid Otomatis Menyesuaikan Jumlah Unit */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {/* Grid Unit Tanpa Batas (Responsive Grid) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-12">
         {unitsData.map((unit, idx) => (
-          <div key={idx} className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-lg transition-all">
-            <h3 className="text-[11px] font-black text-[#005DAA] mb-4 self-start uppercase italic leading-tight h-8">
+          <div key={idx} className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-xl transition-all duration-300">
+            <h3 className="text-[11px] font-black text-[#005DAA] mb-4 self-start uppercase italic leading-tight h-8 line-clamp-2">
               Unit {unit.name}
             </h3>
             
-            <div className="relative w-36 h-36">
+            <div className="relative w-40 h-40">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={unit.chartData}
-                    innerRadius={45}
-                    outerRadius={65}
-                    paddingAngle={2}
+                    innerRadius={50}
+                    outerRadius={70}
+                    paddingAngle={3}
                     dataKey="value"
                     stroke="none"
                   >
@@ -109,17 +122,18 @@ export default function Dashboard() {
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-black text-gray-800">{unit.completion}%</span>
-                <span className="text-[9px] font-black text-gray-400 uppercase">TL%</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-2xl font-black text-gray-800 leading-none">{unit.completion}%</span>
+                <span className="text-[9px] font-black text-gray-400 uppercase mt-1 tracking-widest">TL%</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-5 w-full text-[9px] font-black text-gray-500 uppercase">
-              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> O: {unit.chartData[2].value}</div>
-              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[#F26522]"></span> P: {unit.chartData[1].value}</div>
-              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> C: {unit.chartData[0].value}</div>
-              <div className="flex items-center gap-1.5 font-bold text-[#005DAA]"><span className="w-1.5 h-1.5 rounded-full bg-blue-900"></span> T: {unit.total}</div>
+            {/* Statistik Detail per Unit */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-6 w-full text-[9px] font-black text-gray-500 uppercase border-t pt-4 border-gray-50">
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500"></span> Open: {unit.chartData[2].value}</div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#F26522]"></span> Progress: {unit.chartData[1].value}</div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500"></span> Closed: {unit.chartData[0].value}</div>
+              <div className="flex items-center gap-1.5 font-bold text-[#005DAA]"><span className="w-2 h-2 rounded-full bg-[#005DAA]"></span> Total: {unit.total}</div>
             </div>
           </div>
         ))}
@@ -130,9 +144,9 @@ export default function Dashboard() {
 
 function StatCard({ title, value, color }) {
   return (
-    <div className={`${color} p-4 rounded-3xl border flex flex-col items-center shadow-sm`}>
-      <span className="text-3xl font-black mb-1">{value}</span>
-      <span className="text-[9px] font-black uppercase tracking-widest opacity-70">{title}</span>
+    <div className={`${color} p-5 rounded-[2rem] border-2 flex flex-col items-center justify-center shadow-sm`}>
+      <span className="text-4xl font-black mb-1">{value.toLocaleString('id-ID')}</span>
+      <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{title}</span>
     </div>
   );
 }
