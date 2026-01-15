@@ -22,21 +22,35 @@ export default function Dashboard() {
 
   const fetchHazardStatistics = async () => {
     try {
-      // PERBAIKAN: Mengambil data tanpa limit default Supabase
-      // Kita melakukan fetch secara rekursif atau menggunakan range jika data sangat besar (>10.000)
-      // Untuk ribuan data, query ini sudah cukup stabil:
-      const { data, error } = await supabase
-        .from('hazards')
-        .select('*'); 
-      
-      if (error) throw error;
-      if (!data || data.length === 0) return;
+      let allData = [];
+      let from = 0;
+      let to = 999;
+      let hasMore = true;
 
-      // 1. Hitung Ringkasan Total (Summary)
-      // Data yang dihitung di sini mencakup seluruh baris yang ditarik dari DB
-      const totalOpen = data.filter(d => d.status === 'Open').length;
-      const totalProgress = data.filter(d => d.status === 'Work In Progress').length;
-      const totalClosed = data.filter(d => d.status === 'Closed').length;
+      // LOGIKA NO LIMIT: Melakukan fetch berulang (pagination) sampai semua data terbaca 
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('hazards')
+          .select('*')
+          .range(from, to);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allData = [...allData, ...data];
+          from += 1000;
+          to += 1000;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (allData.length === 0) return;
+
+      // 1. Hitung Ringkasan Total untuk Card Atas 
+      const totalOpen = allData.filter(d => d.status === 'Open').length;
+      const totalProgress = allData.filter(d => d.status === 'Work In Progress').length;
+      const totalClosed = allData.filter(d => d.status === 'Closed').length;
 
       setSummary({
         new: totalOpen,
@@ -45,18 +59,17 @@ export default function Dashboard() {
         closed: totalClosed
       });
 
-      // 2. LOGIKA UNIT DINAMIS (Tanpa Batas Jumlah Unit) [cite: 310, 311]
-      // Mengambil semua nama unit unik yang ada di data hasil import
-      const allUniqueUnits = [...new Set(data.map(item => item.unit))].filter(Boolean);
+      // 2. LOGIKA UNIT DINAMIS: Mengambil semua unit unik yang ada di data 
+      const allUniqueUnits = [...new Set(allData.map(item => item.unit))].filter(Boolean);
 
       const formattedUnits = allUniqueUnits.map(unitName => {
-        const unitItems = data.filter(d => d.unit === unitName);
+        const unitItems = allData.filter(d => d.unit === unitName);
         const total = unitItems.length;
         const closed = unitItems.filter(d => d.status === 'Closed').length;
         const progress = unitItems.filter(d => d.status === 'Work In Progress').length;
         const open = unitItems.filter(d => d.status === 'Open').length;
         
-        // Hitung persentase penyelesaian per unit
+        // Hitung persentase penyelesaian (TL%) per unit 
         const completion = total > 0 ? Math.round((closed / total) * 100) : 0;
 
         return {
@@ -65,13 +78,13 @@ export default function Dashboard() {
           completion,
           chartData: [
             { name: 'Closed', value: closed, color: '#22c55e' },
-            { name: 'Progress', value: progress, color: '#F26522' }, // Warna Oranye KAI 
+            { name: 'Progress', value: progress, color: '#F26522' },
             { name: 'Open', value: open, color: '#ef4444' }
           ]
         };
       });
 
-      // Urutkan unit secara alfabetis agar konsisten
+      // Urutkan unit secara alfabetis agar tampilan rapi 
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (error) {
       console.error("Gagal memuat dashboard:", error.message);
@@ -85,11 +98,11 @@ export default function Dashboard() {
       <div className="mb-8 flex justify-between items-center border-b pb-4">
         <div>
           <h1 className="text-2xl font-black text-[#005DAA] uppercase italic">Hazard Report Dashboard</h1>
-          <p className="text-sm text-gray-400 font-bold uppercase tracking-tighter">Monitoring Data DAOP 4 Semarang</p>
+          <p className="text-sm text-gray-400 font-bold uppercase tracking-tighter">DAOP 4 Semarang Monitoring</p>
         </div>
       </div>
 
-      {/* Ringkasan Total Data */}
+      {/* Ringkasan Stats Atas  */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         <StatCard title="Total Open" value={summary.open} color="bg-orange-50 text-orange-600 border-orange-100" />
         <StatCard title="Total Progress" value={summary.progress} color="bg-blue-50 text-[#005DAA] border-blue-100" />
@@ -97,7 +110,7 @@ export default function Dashboard() {
         <StatCard title="Grand Total" value={summary.open + summary.progress + summary.closed} color="bg-gray-50 text-gray-800 border-gray-200" />
       </div>
 
-      {/* Grid Unit Tanpa Batas (Responsive Grid) */}
+      {/* Grid Unit Dinamis (Menampilkan Semua Unit yang Ada) [cite: 3, 5, 8] */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-12">
         {unitsData.map((unit, idx) => (
           <div key={idx} className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-xl transition-all duration-300">
@@ -128,7 +141,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Statistik Detail per Unit */}
+            {/* Detail Statistik per Unit  */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-6 w-full text-[9px] font-black text-gray-500 uppercase border-t pt-4 border-gray-50">
               <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500"></span> Open: {unit.chartData[2].value}</div>
               <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#F26522]"></span> Progress: {unit.chartData[1].value}</div>
