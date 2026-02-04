@@ -18,8 +18,7 @@ export default function Dashboard() {
   });
   const [lastUpdate, setLastUpdate] = useState('');
 
-  // SKEMA WARNA (SESUAI GAMBAR DESIGN A)
-  // New = Merah/Pink, Open = Kuning, Progress = Hijau, Close = Ungu
+  // SKEMA WARNA (SESUAI VISUAL MERAH-KUNING-HIJAU-UNGU)
   const COLORS = {
     new: '#ef4444',      // Merah
     open: '#f59e0b',     // Kuning/Orange
@@ -67,13 +66,10 @@ export default function Dashboard() {
       const grandTotal = allData.length;
       if (grandTotal === 0) return;
 
-      // Asumsi: New Hazard diambil dari Open (karena di excel biasanya blm ada status 'New')
-      // Atau kalau ada status 'New', ganti filter di bawah.
       const tOpen = allData.filter(d => d.status === 'Open').length;
       const tProg = allData.filter(d => d.status === 'Work In Progress').length;
       const tClosed = allData.filter(d => d.status === 'Closed').length;
       
-      // Hitung persentase
       setSummary({
         open: tOpen,
         pctOpen: Math.round((tOpen / grandTotal) * 100) || 0,
@@ -118,139 +114,144 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      {/* --- HEADER PAGE (JUDUL & TOMBOL IMPORT TERPISAH) --- */}
-      <div className="flex justify-between items-center mb-6 px-2">
-        <h1 className="text-3xl font-bold text-black">Dashboard</h1>
+      {/* Wrapper Utama agar tidak melebar ke seluruh layar monitor besar */}
+      <div className="w-full max-w-6xl mx-auto">
         
-        {/* Tombol Import Kecil di Pojok Kanan Atas */}
-        <Link href="/admin/import">
-          <button className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
-            <UploadCloud size={16} />
-            Import File
-          </button>
-        </Link>
-      </div>
-
-      {/* --- SATU KOTAK PUTIH BESAR (CONTAINER UTAMA) --- */}
-      {/* Ini yang bikin sama persis kayak Design A */}
-      <div className="bg-white rounded-[1.5rem] p-8 shadow-sm mb-10 border border-gray-100">
-        
-        {/* Header Dalam Kotak */}
-        <div className="flex justify-between items-start mb-8">
-            <div>
-                <h2 className="text-xl font-bold text-[#005DAA] mb-2">Hazard Report</h2>
-                <span className="border border-gray-300 text-gray-500 text-xs px-3 py-1 rounded-full font-medium">
-                    KAI DAOP 4
-                </span>
-                <p className="text-[10px] text-gray-400 mt-2 font-medium">
-                    Last Updated : <br/> {lastUpdate}
-                </p>
-            </div>
+        {/* --- HEADER PAGE --- */}
+        <div className="flex justify-between items-center mb-6 px-1">
+            <h1 className="text-3xl font-bold text-black">Dashboard</h1>
             
-            <div className="text-right">
-                <span className="text-6xl font-black text-gray-800 tracking-tight">
-                    {summary.total}
-                </span>
-                <p className="text-sm text-gray-500 font-medium mt-1">Total Hazard</p>
+            {/* Tombol Import */}
+            <Link href="/admin/import">
+            <button className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
+                <UploadCloud size={16} />
+                Import File
+            </button>
+            </Link>
+        </div>
+
+        {/* --- KOTAK PUTIH UTAMA (RINGKASAN) --- */}
+        {/* max-w-full agar mengikuti wrapper induk (6xl), tidak stretch ke 100vw */}
+        <div className="bg-white rounded-[1.5rem] p-8 shadow-sm mb-10 border border-gray-100">
+            
+            {/* Header Dalam Kotak */}
+            <div className="flex justify-between items-start mb-8 border-b border-gray-50 pb-4">
+                <div>
+                    <h2 className="text-xl font-bold text-[#005DAA] mb-2">Hazard Report</h2>
+                    <span className="border border-gray-300 text-gray-500 text-xs px-3 py-1 rounded-full font-medium">
+                        KAI DAOP 4
+                    </span>
+                    <p className="text-[10px] text-gray-400 mt-2 font-medium">
+                        Last Updated : <br/> {lastUpdate}
+                    </p>
+                </div>
+                
+                <div className="text-right">
+                    <span className="text-6xl font-black text-gray-800 tracking-tight">
+                        {summary.total}
+                    </span>
+                    <p className="text-sm text-gray-500 font-medium mt-1">Total Hazard</p>
+                </div>
+            </div>
+
+            {/* Row Grafik Setengah Lingkaran (Grid lebih rapat) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <BigGauge label="New Hazard" pct={summary.pctOpen} color={COLORS.new} />
+                <BigGauge label="Open Hazard" pct={summary.pctOpen} color={COLORS.open} />
+                <BigGauge label="In Progress" pct={summary.pctProgress} color={COLORS.progress} />
+                <BigGauge label="Close Hazard" pct={summary.pctClosed} color={COLORS.closed} />
             </div>
         </div>
 
-        {/* Row 4 Grafik Setengah Lingkaran */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            <BigGauge label="New Hazard" pct={summary.pctOpen} color={COLORS.new} />
-            <BigGauge label="Open Hazard" pct={summary.pctOpen} color={COLORS.open} />
-            <BigGauge label="In Progress" pct={summary.pctProgress} color={COLORS.progress} />
-            <BigGauge label="Close Hazard" pct={summary.pctClosed} color={COLORS.closed} />
+        {/* --- UNIT ANALYTICS (GRID BAWAH) --- */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
+            {unitsData.map((unit, idx) => (
+            <div key={idx} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300">
+                
+                {/* Judul Unit */}
+                <h4 className="text-sm font-medium text-gray-600 mb-4 h-5 truncate">
+                    {unit.name}
+                </h4>
+
+                {/* Chart Unit */}
+                <div className="relative w-full h-32 flex justify-center items-end overflow-hidden mb-6">
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                    <Pie
+                        data={unit.chartData}
+                        cx="50%" cy="100%"
+                        startAngle={180} endAngle={0}
+                        innerRadius={60} outerRadius={85}
+                        paddingAngle={2} dataKey="value" stroke="none"
+                    >
+                        {unit.chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                    </Pie>
+                    </PieChart>
+                </ResponsiveContainer>
+                
+                {/* Persentase TL% */}
+                <div className="absolute bottom-0 mb-1 flex flex-col items-center">
+                    <span className="text-2xl font-black text-[#005DAA] leading-none">
+                        {unit.completion}%
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-bold mt-1">TL%</span>
+                </div>
+                </div>
+
+                {/* Legend Unit */}
+                <div className="flex justify-between items-end px-1 gap-2">
+                    {/* Open */}
+                    <div className="flex gap-1.5 items-center">
+                        <div className="w-1 h-6 bg-[#f59e0b] rounded-full"></div>
+                        <div>
+                            <span className="text-[9px] text-gray-400 block uppercase font-bold">Open</span>
+                            <span className="text-sm font-bold text-gray-800 leading-none">{unit.chartData[0].value}</span>
+                        </div>
+                    </div>
+                    
+                    {/* Progress */}
+                    <div className="flex gap-1.5 items-center">
+                        <div className="w-1 h-6 bg-[#10b981] rounded-full"></div>
+                        <div>
+                            <span className="text-[9px] text-gray-400 block uppercase font-bold">Prog</span>
+                            <span className="text-sm font-bold text-gray-800 leading-none">{unit.chartData[1].value}</span>
+                        </div>
+                    </div>
+
+                    {/* Close */}
+                    <div className="flex gap-1.5 items-center">
+                        <div className="w-1 h-6 bg-[#8b5cf6] rounded-full"></div>
+                        <div>
+                            <span className="text-[9px] text-gray-400 block uppercase font-bold">Close</span>
+                            <span className="text-sm font-bold text-gray-800 leading-none">{unit.chartData[2].value}</span>
+                        </div>
+                    </div>
+                    
+                    {/* Total */}
+                    <div className="flex gap-1.5 items-center border-l pl-2 border-gray-100">
+                        <div className="w-1 h-6 bg-gray-400 rounded-full"></div>
+                        <div>
+                            <span className="text-[9px] text-gray-400 block uppercase font-bold">Total</span>
+                            <span className="text-sm font-bold text-gray-800 leading-none">{unit.total}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            ))}
         </div>
-      </div>
 
-      {/* --- BAGIAN BAWAH: UNIT ANALYTICS --- */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
-        {unitsData.map((unit, idx) => (
-          <div key={idx} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300">
-            
-            {/* Judul Unit */}
-            <h4 className="text-sm font-medium text-gray-600 mb-4">
-                {unit.name}
-            </h4>
-
-            {/* Chart Unit */}
-            <div className="relative w-full h-32 flex justify-center items-end overflow-hidden mb-6">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={unit.chartData}
-                    cx="50%" cy="100%"
-                    startAngle={180} endAngle={0}
-                    innerRadius={60} outerRadius={85}
-                    paddingAngle={2} dataKey="value" stroke="none"
-                  >
-                    {unit.chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              
-              {/* Persentase TL% */}
-              <div className="absolute bottom-0 mb-1 flex flex-col items-center">
-                <span className="text-2xl font-black text-[#005DAA] leading-none">
-                    {unit.completion}%
-                </span>
-                <span className="text-[10px] text-gray-400 font-bold mt-1">TL%</span>
-              </div>
-            </div>
-
-            {/* Legend Unit (Garis Warna) */}
-            <div className="flex justify-between items-end px-2">
-                 {/* Open */}
-                 <div className="flex gap-2 items-center">
-                    <div className="w-1 h-8 bg-[#f59e0b] rounded-full"></div>
-                    <div>
-                        <span className="text-[10px] text-gray-400 block">Open</span>
-                        <span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[0].value.toLocaleString()}</span>
-                    </div>
-                 </div>
-                 
-                 {/* Progress */}
-                 <div className="flex gap-2 items-center">
-                    <div className="w-1 h-8 bg-[#10b981] rounded-full"></div>
-                    <div>
-                        <span className="text-[10px] text-gray-400 block">In Progress</span>
-                        <span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[1].value.toLocaleString()}</span>
-                    </div>
-                 </div>
-
-                 {/* Close */}
-                 <div className="flex gap-2 items-center">
-                    <div className="w-1 h-8 bg-[#8b5cf6] rounded-full"></div>
-                    <div>
-                        <span className="text-[10px] text-gray-400 block">Close</span>
-                        <span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[2].value.toLocaleString()}</span>
-                    </div>
-                 </div>
-                 
-                 {/* Total */}
-                 <div className="flex gap-2 items-center border-l pl-2 border-gray-200">
-                    <div className="w-1 h-8 bg-gray-400 rounded-full"></div>
-                    <div>
-                        <span className="text-[10px] text-gray-400 block">Total</span>
-                        <span className="text-lg font-bold text-gray-800 leading-none">{unit.total.toLocaleString()}</span>
-                    </div>
-                 </div>
-            </div>
-          </div>
-        ))}
       </div>
     </Layout>
   );
 }
 
-// KOMPONEN CHART GAUGE BESAR (UNTUK KOTAK UTAMA)
+// KOMPONEN GAUGE CARD BESAR
 function BigGauge({ label, pct, color }) {
     const data = [
         { value: pct, color: color },
-        { value: 100 - pct, color: '#e5e7eb' } // Gray background part
+        { value: 100 - pct, color: '#e5e7eb' }
     ];
 
     return (
