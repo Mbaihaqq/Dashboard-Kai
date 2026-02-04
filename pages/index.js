@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link'; // Import Link untuk tombol
+import Link from 'next/link';
 import Layout from '../components/Layout';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
-// Import Ikon
-import { Database, AlertCircle, Clock, CheckCircle, UploadCloud } from 'lucide-react';
+import { Database, AlertCircle, Clock, CheckCircle, UploadCloud, Calendar } from 'lucide-react';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -48,7 +47,6 @@ export default function Dashboard() {
       let to = 999;
       let hasMore = true;
 
-      // 1. Fetch Data (No Limit)
       while (hasMore) {
         const { data, error } = await supabase
           .from('hazards')
@@ -68,7 +66,6 @@ export default function Dashboard() {
       const grandTotal = allData.length;
       if (grandTotal === 0) return;
 
-      // 2. Summary & Persentase
       const tOpen = allData.filter(d => d.status === 'Open').length;
       const tProg = allData.filter(d => d.status === 'Work In Progress').length;
       const tClosed = allData.filter(d => d.status === 'Closed').length;
@@ -83,7 +80,6 @@ export default function Dashboard() {
         total: grandTotal
       });
 
-      // 3. Unit Data
       const allUniqueUnits = [...new Set(allData.map(item => item.unit?.trim()))].filter(Boolean);
 
       const formattedUnits = allUniqueUnits.map(unitName => {
@@ -118,83 +114,94 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      {/* --- HEADER DASHBOARD --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4 border-b border-gray-200 pb-5">
+      {/* --- CONTAINER ATAS (SPLIT 2 KOLOM) --- */}
+      <div className="flex flex-col xl:flex-row gap-6 mb-10 items-stretch">
         
-        {/* Kiri: Judul */}
-        <div>
-           <h1 className="text-3xl font-black text-[#005DAA] uppercase tracking-tighter leading-none">
-             Hazard Monitoring
-           </h1>
-           <p className="text-xs text-gray-500 font-bold tracking-wide mt-1">
-             DAOP 4 SEMARANG SYSTEM
-           </p>
-        </div>
-        
-        {/* Kanan: Tombol Import & Info Update */}
-        <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
-            <div className="text-right">
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest block">Last Update</span>
-                <span className="text-xs font-bold text-gray-700 bg-white border border-gray-200 px-3 py-1 rounded-full shadow-sm block mt-0.5">
-                    {lastUpdate}
-                </span>
+        {/* KOLOM KIRI: JUDUL, INFO, & 4 KARTU GRAFIK (Expanded) */}
+        <div className="flex-1 flex flex-col justify-between gap-6">
+            
+            {/* Header Text & Update Info */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end px-2">
+                <div>
+                   <h1 className="text-3xl font-black text-[#005DAA] uppercase tracking-tighter leading-none">
+                     Hazard Monitoring
+                   </h1>
+                   <p className="text-xs text-gray-500 font-bold tracking-wide mt-1">
+                     DAOP 4 SEMARANG SYSTEM
+                   </p>
+                </div>
+                <div className="flex items-center gap-2 mt-2 md:mt-0 text-gray-500 bg-white border border-gray-200 px-3 py-1.5 rounded-full shadow-sm">
+                    <Calendar size={14} className="text-[#005DAA]" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Update: {lastUpdate}</span>
+                </div>
             </div>
 
-            {/* TOMBOL IMPORT DATA (BARU) */}
+            {/* Grid 4 Kartu Ringkasan (Gauge Half Circle) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <GaugeCard 
+                    title="Total Data" count={summary.total} percentage={100}
+                    colorBg="bg-[#005DAA]" colorFill={COLORS.total} textColor="text-white"
+                    icon={<Database size={16} className="text-white" />}
+                    isDark={true} // Style khusus untuk Total
+                />
+                <GaugeCard 
+                    title="Open Hazard" count={summary.open} percentage={summary.pctOpen}
+                    colorBg="bg-red-50" colorFill={COLORS.open} textColor="text-red-600"
+                    icon={<AlertCircle size={16} className="text-red-500" />}
+                />
+                <GaugeCard 
+                    title="In Progress" count={summary.progress} percentage={summary.pctProgress}
+                    colorBg="bg-purple-50" colorFill={COLORS.progress} textColor="text-purple-600"
+                    icon={<Clock size={16} className="text-purple-500" />}
+                />
+                <GaugeCard 
+                    title="Closed" count={summary.closed} percentage={summary.pctClosed}
+                    colorBg="bg-green-50" colorFill={COLORS.closed} textColor="text-green-600"
+                    icon={<CheckCircle size={16} className="text-green-500" />}
+                />
+            </div>
+        </div>
+
+        {/* KOLOM KANAN: TOMBOL IMPORT ONLY (Fixed Width) */}
+        <div className="w-full xl:w-48 flex-shrink-0">
             <Link href="/admin/import">
-                <button className="flex items-center gap-2 bg-[#22c55e] hover:bg-green-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5">
-                    <UploadCloud size={18} />
-                    <span className="text-sm">Import Data</span>
+                <button className="w-full h-full min-h-[180px] bg-white border-2 border-dashed border-[#005DAA]/30 hover:border-[#005DAA] hover:bg-blue-50/30 rounded-[2rem] flex flex-col items-center justify-center gap-4 group transition-all duration-300">
+                    <div className="w-16 h-16 bg-[#005DAA] rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                        <UploadCloud size={32} className="text-white" />
+                    </div>
+                    <div className="text-center">
+                        <span className="block text-sm font-black text-[#005DAA] uppercase tracking-wider">Import File</span>
+                        <span className="block text-[10px] font-bold text-gray-400 mt-1">Excel / CSV</span>
+                    </div>
                 </button>
             </Link>
         </div>
-      </div>
 
-      {/* --- BAGIAN ATAS: GAUGE CARDS (HALF CIRCLE) --- */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <GaugeCard 
-            title="Total Data" count={summary.total} percentage={100}
-            colorBg="bg-[#005DAA]" colorFill={COLORS.total}
-            icon={<Database size={16} className="text-white" />}
-        />
-        <GaugeCard 
-            title="Open Hazard" count={summary.open} percentage={summary.pctOpen}
-            colorBg="bg-red-500" colorFill={COLORS.open}
-            icon={<AlertCircle size={16} className="text-white" />}
-        />
-        <GaugeCard 
-            title="In Progress" count={summary.progress} percentage={summary.pctProgress}
-            colorBg="bg-[#d946ef]" colorFill={COLORS.progress}
-            icon={<Clock size={16} className="text-white" />}
-        />
-        <GaugeCard 
-            title="Closed" count={summary.closed} percentage={summary.pctClosed}
-            colorBg="bg-green-500" colorFill={COLORS.closed}
-            icon={<CheckCircle size={16} className="text-white" />}
-        />
       </div>
 
       {/* --- BAGIAN BAWAH: UNIT ANALYTICS --- */}
-      <div className="flex items-center justify-between mb-4 border-t border-gray-200 pt-6">
-         <div className="flex items-center gap-2">
-            <div className="h-5 w-1.5 bg-[#005DAA] rounded-full"></div>
-            <h3 className="text-lg font-black text-gray-800 uppercase italic">Unit Analytics Detail</h3>
+      <div className="flex items-center justify-between mb-4 border-t border-gray-200 pt-8">
+         <div className="flex items-center gap-3">
+            <div className="h-6 w-1.5 bg-[#005DAA] rounded-full"></div>
+            <h3 className="text-xl font-black text-gray-800 uppercase italic">Unit Analytics Detail</h3>
          </div>
-         <span className="bg-gray-100 text-gray-600 text-[10px] px-3 py-1 rounded-full font-bold border border-gray-200">
+         <span className="bg-gray-100 text-gray-600 text-[10px] px-3 py-1.5 rounded-full font-bold border border-gray-200">
             {unitsData.length} Units Found
          </span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-12">
         {unitsData.map((unit, idx) => (
-          <div key={idx} className="bg-white p-5 rounded-[1.5rem] shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group">
+          <div key={idx} className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group">
             
             {/* Header Unit */}
-            <div className="mb-1 h-8 flex justify-between items-center">
+            <div className="mb-2 flex justify-between items-start h-8">
                 <h4 className="text-xs font-black text-[#005DAA] uppercase leading-tight line-clamp-2 w-3/4 group-hover:text-[#F26522] transition-colors">
                     {unit.name}
                 </h4>
-                <span className="text-[10px] font-bold text-gray-500 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">{unit.total}</span>
+                <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
+                    {unit.total}
+                </span>
             </div>
 
             {/* CHART SETENGAH LINGKARAN */}
@@ -259,30 +266,31 @@ export default function Dashboard() {
   );
 }
 
-// Komponen GAUGE CARD (Atas)
-function GaugeCard({ title, count, percentage, colorBg, colorFill, icon }) {
+// KOMPONEN GAUGE CARD (Atas)
+function GaugeCard({ title, count, percentage, colorBg, colorFill, textColor, icon, isDark }) {
   const chartData = [
     { value: percentage, color: colorFill }, 
-    { value: 100 - percentage, color: '#f3f4f6' }
+    { value: 100 - percentage, color: isDark ? '#ffffff30' : '#e5e7eb' }
   ];
 
   return (
-    <div className="bg-white p-4 rounded-[1.5rem] shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition-all">
-      <div className={`absolute top-0 left-0 w-full h-1 ${colorBg}`}></div>
+    <div className={`p-4 rounded-[1.8rem] shadow-sm border border-transparent hover:border-gray-200 transition-all relative overflow-hidden group ${colorBg}`}>
       
-      <div className="flex justify-between items-start mb-3">
+      {/* Header Kartu */}
+      <div className="flex justify-between items-start mb-2 relative z-10">
          <div className="flex items-center gap-2">
-            <div className={`p-1.5 rounded-lg ${colorBg} shadow-sm`}>
+            <div className={`p-1.5 rounded-lg shadow-sm ${isDark ? 'bg-white/20 text-white' : 'bg-white text-gray-600'}`}>
                 {icon}
             </div>
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-600">{title}</h3>
+            <h3 className={`text-[10px] font-black uppercase tracking-widest ${isDark ? 'text-blue-100' : textColor} opacity-80`}>{title}</h3>
          </div>
-         <span className="text-xs font-bold text-gray-700 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100">
+         <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${isDark ? 'bg-white/20 text-white' : 'bg-white text-gray-600 border border-gray-100'}`}>
             {count.toLocaleString()}
          </span>
       </div>
 
-      <div className="relative w-full h-20 flex justify-center items-end overflow-hidden">
+      {/* Half Circle Gauge */}
+      <div className="relative w-full h-20 flex justify-center items-end overflow-hidden z-10">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -298,8 +306,9 @@ function GaugeCard({ title, count, percentage, colorBg, colorFill, icon }) {
           </PieChart>
         </ResponsiveContainer>
         
+        {/* Persentase */}
         <div className="absolute bottom-0 -mb-1 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-2xl font-black leading-none" style={{color: colorFill}}>
+          <span className={`text-2xl font-black leading-none ${isDark ? 'text-white' : textColor}`}>
               {percentage}%
           </span>
         </div>
