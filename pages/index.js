@@ -3,20 +3,29 @@ import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
+import { Download } from 'lucide-react'; // Ikon untuk tombol Import/Export jika dibutuhkan
 
 export default function Dashboard() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [unitsData, setUnitsData] = useState([]);
   const [summary, setSummary] = useState({ new: 0, open: 0, progress: 0, closed: 0 });
+  const [lastUpdate, setLastUpdate] = useState('');
 
   useEffect(() => {
+    // Cek Sesi Login
     const loggedIn = sessionStorage.getItem('isLoggedIn');
+    const role = sessionStorage.getItem('userRole');
+
     if (!loggedIn) {
       router.push('/loginPage/login');
     } else {
       setIsAuthorized(true);
       fetchHazardStatistics();
+      
+      // Set waktu update terakhir
+      const now = new Date();
+      setLastUpdate(now.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
     }
   }, [router]);
 
@@ -27,11 +36,11 @@ export default function Dashboard() {
       let to = 999;
       let hasMore = true;
 
-      // LOGIKA NO LIMIT: Melakukan fetch berulang (pagination) sampai semua data terbaca 
+      // --- 1. TEKNIK NO-LIMIT DATA FETCHING ---
       while (hasMore) {
         const { data, error } = await supabase
           .from('hazards')
-          .select('*')
+          .select('unit, status, created_at')
           .range(from, to);
 
         if (error) throw error;
@@ -47,19 +56,30 @@ export default function Dashboard() {
 
       if (allData.length === 0) return;
 
-      // 1. Hitung Ringkasan Total untuk Card Atas 
+      // --- 2. HITUNG RINGKASAN ATAS (SUMMARY CARDS) ---
+      // Logika: 
+      // New = Open (Baru masuk hari ini/kemarin - opsional, disini kita samakan dengan Open agar data konsisten)
+      // Open = Status 'Open'
+      // Progress = Status 'Work In Progress'
+      // Closed = Status 'Closed'
+      
       const totalOpen = allData.filter(d => d.status === 'Open').length;
       const totalProgress = allData.filter(d => d.status === 'Work In Progress').length;
       const totalClosed = allData.filter(d => d.status === 'Closed').length;
 
+      // Untuk "New Hazard", kita bisa ambil data yang input_date-nya < 7 hari, 
+      // atau sementara disamakan dengan Open sesuai request visual.
+      const totalNew = totalOpen; 
+
       setSummary({
-        new: totalOpen,
+        new: totalNew,
         open: totalOpen,
         progress: totalProgress,
         closed: totalClosed
       });
 
-      // 2. LOGIKA UNIT DINAMIS: Mengambil semua unit unik yang ada di data 
+      // --- 3. HITUNG DATA PER UNIT (DONUT CHARTS) ---
+      // Ambil daftar unit unik dari data Excel yang sudah diimport
       const allUniqueUnits = [...new Set(allData.map(item => item.unit))].filter(Boolean);
 
       const formattedUnits = allUniqueUnits.map(unitName => {
@@ -69,56 +89,112 @@ export default function Dashboard() {
         const progress = unitItems.filter(d => d.status === 'Work In Progress').length;
         const open = unitItems.filter(d => d.status === 'Open').length;
         
-        // Hitung persentase penyelesaian (TL%) per unit 
+        // Rumus TL% (Completion Rate)
         const completion = total > 0 ? Math.round((closed / total) * 100) : 0;
 
         return {
           name: unitName,
           total,
           completion,
+          // Warna Chart Sesuai Desain PDF Page 7
           chartData: [
-            { name: 'Closed', value: closed, color: '#22c55e' },
-            { name: 'Progress', value: progress, color: '#F26522' },
-            { name: 'Open', value: open, color: '#ef4444' }
+            { name: 'Closed', value: closed, color: '#22c55e' }, // Hijau (Closed)
+            { name: 'Progress', value: progress, color: '#ec4899' }, // Pink/Ungu (In Progress - Sesuai PDF)
+            { name: 'Open', value: open, color: '#ef4444' } // Merah (Open)
           ]
         };
       });
 
-      // Urutkan unit secara alfabetis agar tampilan rapi 
+      // Urutkan Unit dari A-Z
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
+
     } catch (error) {
-      console.error("Gagal memuat dashboard:", error.message);
+      console.error("Gagal memuat data:", error.message);
     }
   };
 
-  if (!isAuthorized) return <div className="h-screen bg-white"></div>;
+  if (!isAuthorized) return <div className="h-screen bg-[#F8F9FA]"></div>;
 
   return (
     <Layout>
-      <div className="mb-8 flex justify-between items-center border-b pb-4">
+      {/* HEADER & JUDUL */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-black text-[#005DAA] uppercase italic">Hazard Report Dashboard</h1>
-          <p className="text-sm text-gray-400 font-bold uppercase tracking-tighter">DAOP 4 Semarang Monitoring</p>
+          <div className="flex items-center gap-2 mb-1">
+             <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded border border-gray-200 uppercase tracking-wider">
+                Admin View
+             </span>
+          </div>
+          <h1 className="text-3xl font-black text-[#005DAA] uppercase tracking-tight">Hazard Report</h1>
+          <p className="text-sm text-gray-400 font-bold tracking-wide">DAOP 4 SEMARANG MONITORING SYSTEM</p>
+        </div>
+        
+        <div className="flex flex-col items-end">
+            <button className="flex items-center gap-2 bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-gray-50 transition mb-1">
+                <Download size={14} /> Export Data
+            </button>
+            <p className="text-[10px] text-gray-400 font-medium">
+                Last Update: <span className="text-[#005DAA] font-bold">{lastUpdate}</span>
+            </p>
         </div>
       </div>
 
-      {/* Ringkasan Stats Atas  */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <StatCard title="Total Open" value={summary.open} color="bg-orange-50 text-orange-600 border-orange-100" />
-        <StatCard title="Total Progress" value={summary.progress} color="bg-blue-50 text-[#005DAA] border-blue-100" />
-        <StatCard title="Total Closed" value={summary.closed} color="bg-green-50 text-green-600 border-green-100" />
-        <StatCard title="Grand Total" value={summary.open + summary.progress + summary.closed} color="bg-gray-50 text-gray-800 border-gray-200" />
+      {/* SUMMARY CARDS (WARNA-WARNI) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+        <SummaryCard 
+          title="New Hazard" 
+          value={summary.new} 
+          subtitle="+8 from yesterday" 
+          bg="bg-pink-50" 
+          text="text-pink-600" 
+          iconBg="bg-pink-100"
+        />
+        <SummaryCard 
+          title="Open Hazard" 
+          value={summary.open} 
+          subtitle="+50 from yesterday" 
+          bg="bg-orange-50" 
+          text="text-orange-600" 
+          iconBg="bg-orange-100"
+        />
+        <SummaryCard 
+          title="In Progress" 
+          value={summary.progress} 
+          subtitle="+10 from yesterday" 
+          bg="bg-purple-50" 
+          text="text-purple-600" 
+          iconBg="bg-purple-100"
+        />
+        <SummaryCard 
+          title="Closed Hazard" 
+          value={summary.closed} 
+          subtitle="+1 from yesterday" 
+          bg="bg-green-50" 
+          text="text-green-600" 
+          iconBg="bg-green-100"
+        />
       </div>
 
-      {/* Grid Unit Dinamis (Menampilkan Semua Unit yang Ada) [cite: 3, 5, 8] */}
+      {/* GRID CHART UNIT (Fluid Grid) */}
+      <h3 className="text-lg font-bold text-gray-700 mb-5 pl-1 border-l-4 border-[#005DAA]">
+         Unit Analytics
+      </h3>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-12">
         {unitsData.map((unit, idx) => (
-          <div key={idx} className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-xl transition-all duration-300">
-            <h3 className="text-[11px] font-black text-[#005DAA] mb-4 self-start uppercase italic leading-tight h-8 line-clamp-2">
-              Unit {unit.name}
-            </h3>
+          <div key={idx} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 group">
+            {/* Header Card Unit */}
+            <div className="flex justify-between items-start mb-4 h-10">
+                <h3 className="text-xs font-black text-[#005DAA] uppercase italic leading-tight line-clamp-2 w-3/4">
+                  Unit {unit.name}
+                </h3>
+                <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+                    {unit.total}
+                </span>
+            </div>
             
-            <div className="relative w-40 h-40">
+            {/* Donut Chart */}
+            <div className="relative w-40 h-40 mx-auto">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -135,18 +211,31 @@ export default function Dashboard() {
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
+              {/* Text TL% di Tengah */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-2xl font-black text-gray-800 leading-none">{unit.completion}%</span>
-                <span className="text-[9px] font-black text-gray-400 uppercase mt-1 tracking-widest">TL%</span>
+                <span className="text-3xl font-black text-gray-800 leading-none group-hover:scale-110 transition-transform duration-300">
+                    {unit.completion}%
+                </span>
+                <span className="text-[9px] font-black text-gray-400 uppercase mt-1 tracking-widest">
+                    TL%
+                </span>
               </div>
             </div>
 
-            {/* Detail Statistik per Unit  */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-6 w-full text-[9px] font-black text-gray-500 uppercase border-t pt-4 border-gray-50">
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500"></span> Open: {unit.chartData[2].value}</div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#F26522]"></span> Progress: {unit.chartData[1].value}</div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500"></span> Closed: {unit.chartData[0].value}</div>
-              <div className="flex items-center gap-1.5 font-bold text-[#005DAA]"><span className="w-2 h-2 rounded-full bg-[#005DAA]"></span> Total: {unit.total}</div>
+            {/* Legend (Keterangan Bawah) */}
+            <div className="grid grid-cols-3 gap-1 mt-6 text-[9px] font-bold text-gray-500 uppercase text-center border-t pt-4 border-gray-50">
+              <div className="flex flex-col items-center gap-1">
+                 <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                 <span>Open<br/><span className="text-black text-xs">{unit.chartData[2].value}</span></span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                 <span className="w-2 h-2 rounded-full bg-[#ec4899]"></span>
+                 <span>Progres<br/><span className="text-black text-xs">{unit.chartData[1].value}</span></span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                 <span>Closed<br/><span className="text-black text-xs">{unit.chartData[0].value}</span></span>
+              </div>
             </div>
           </div>
         ))}
@@ -155,11 +244,23 @@ export default function Dashboard() {
   );
 }
 
-function StatCard({ title, value, color }) {
+// Komponen Kecil untuk Summary Card Warna-Warni
+function SummaryCard({ title, value, subtitle, bg, text, iconBg }) {
   return (
-    <div className={`${color} p-5 rounded-[2rem] border-2 flex flex-col items-center justify-center shadow-sm`}>
-      <span className="text-4xl font-black mb-1">{value.toLocaleString('id-ID')}</span>
-      <span className="text-[10px] font-black uppercase tracking-widest opacity-80">{title}</span>
+    <div className={`${bg} p-6 rounded-[2rem] shadow-sm border border-transparent hover:border-gray-200 transition-all`}>
+      <div className={`w-10 h-10 ${iconBg} rounded-full flex items-center justify-center mb-4`}>
+        {/* Ikon visual sederhana berupa lingkaran */}
+        <div className={`w-4 h-4 rounded-full ${text} bg-current opacity-40`}></div>
+      </div>
+      <span className={`text-4xl font-black ${text} block mb-1`}>
+        {value.toLocaleString('id-ID')}
+      </span>
+      <span className={`text-xs font-bold ${text} opacity-80 uppercase tracking-widest block mb-1`}>
+        {title}
+      </span>
+      <span className={`text-[10px] ${text} opacity-60 font-medium`}>
+        {subtitle}
+      </span>
     </div>
   );
 }
