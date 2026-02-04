@@ -39,7 +39,7 @@ export default function Dashboard() {
       let to = 999;
       let hasMore = true;
 
-      // 1. Fetch No Limit
+      // 1. Fetch Data (No Limit)
       while (hasMore) {
         const { data, error } = await supabase
           .from('hazards')
@@ -59,7 +59,7 @@ export default function Dashboard() {
       setTotalRows(allData.length);
       if (allData.length === 0) return;
 
-      // 2. Summary Header
+      // 2. Summary
       const totalOpen = allData.filter(d => d.status === 'Open').length;
       const totalProgress = allData.filter(d => d.status === 'Work In Progress').length;
       const totalClosed = allData.filter(d => d.status === 'Closed').length;
@@ -71,7 +71,7 @@ export default function Dashboard() {
         closed: totalClosed
       });
 
-      // 3. Unit Dinamis
+      // 3. Unit Data
       const allUniqueUnits = [...new Set(allData.map(item => item.unit?.trim()))].filter(Boolean);
 
       const formattedUnits = allUniqueUnits.map(unitName => {
@@ -88,7 +88,7 @@ export default function Dashboard() {
           total,
           completion,
           chartData: [
-            // Urutan data penting agar warna 'Closed' (Hijau) muncul di sisi kanan (penuh)
+            // Urutan: Open (Kiri), Progress (Tengah), Closed (Kanan)
             { name: 'Open', value: open, color: COLORS.open },
             { name: 'Progress', value: progress, color: COLORS.progress },
             { name: 'Closed', value: closed, color: COLORS.closed }
@@ -139,7 +139,7 @@ export default function Dashboard() {
         <SummaryCard title="Closed Hazard" value={summary.closed} subtitle="Selesai" bg="bg-green-50" text="text-green-600" />
       </div>
 
-      {/* GRID UNIT (HALF CIRCLE CHARTS) */}
+      {/* GRID UNIT */}
       <div className="flex items-center gap-3 mb-6">
         <div className="h-6 w-1 bg-[#005DAA] rounded-full"></div>
         <h3 className="text-xl font-black text-gray-800 uppercase italic">Unit Analytics</h3>
@@ -162,15 +162,15 @@ export default function Dashboard() {
             </div>
 
             {/* CHART SETENGAH LINGKARAN (HALF CIRCLE) */}
-            <div className="relative w-full h-32 flex justify-center items-end overflow-hidden">
+            <div className="relative w-full h-32 flex justify-center items-end overflow-hidden mb-2">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={unit.chartData}
                     cx="50%"
-                    cy="100%"  // Titik tengah chart ditaruh di paling bawah container
-                    startAngle={180} // Mulai dari kiri (jam 9)
-                    endAngle={0}     // Selesai di kanan (jam 3)
+                    cy="100%"  
+                    startAngle={180} 
+                    endAngle={0}     
                     innerRadius={60}
                     outerRadius={90}
                     paddingAngle={2}
@@ -195,22 +195,39 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Legend Bawah */}
-            <div className="grid grid-cols-3 gap-1 text-center border-t border-gray-50 pt-3 mt-1">
-                <div className="flex flex-col items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 mb-1"></span>
-                    <span className="text-xs font-bold text-gray-600">{unit.chartData[0].value}</span>
-                    <span className="text-[8px] font-bold text-gray-400 uppercase">Open</span>
+            {/* LEGEND DETAIL DI BAWAH CIRCLE */}
+            <div className="flex justify-between items-center mt-2 px-1 border-t border-gray-50 pt-3">
+                {/* OPEN */}
+                <div className="flex flex-col items-center w-1/3">
+                    <span className="text-lg font-black text-red-500 leading-tight">
+                        {unit.chartData[0].value}
+                    </span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase">Open</span>
+                    </div>
                 </div>
-                <div className="flex flex-col items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#d946ef] mb-1"></span>
-                    <span className="text-xs font-bold text-gray-600">{unit.chartData[1].value}</span>
-                    <span className="text-[8px] font-bold text-gray-400 uppercase">Prog</span>
+
+                {/* PROGRESS */}
+                <div className="flex flex-col items-center w-1/3 border-l border-r border-gray-100">
+                    <span className="text-lg font-black text-[#d946ef] leading-tight">
+                        {unit.chartData[1].value}
+                    </span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#d946ef]"></span>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase">Prog</span>
+                    </div>
                 </div>
-                <div className="flex flex-col items-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 mb-1"></span>
-                    <span className="text-xs font-bold text-gray-600">{unit.chartData[2].value}</span>
-                    <span className="text-[8px] font-bold text-gray-400 uppercase">Close</span>
+
+                {/* CLOSED */}
+                <div className="flex flex-col items-center w-1/3">
+                    <span className="text-lg font-black text-green-500 leading-tight">
+                        {unit.chartData[2].value}
+                    </span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase">Close</span>
+                    </div>
                 </div>
             </div>
 
