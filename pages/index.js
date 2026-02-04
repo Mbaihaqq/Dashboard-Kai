@@ -18,7 +18,7 @@ export default function Dashboard() {
   });
   const [lastUpdate, setLastUpdate] = useState('');
 
-  // SKEMA WARNA (SESUAI VISUAL MERAH-KUNING-HIJAU-UNGU)
+  // SKEMA WARNA
   const COLORS = {
     new: '#ef4444',      // Merah
     open: '#f59e0b',     // Kuning/Orange
@@ -114,48 +114,50 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      {/* Wrapper Utama agar tidak melebar ke seluruh layar monitor besar */}
-      <div className="w-full max-w-6xl mx-auto">
+      {/* WRAPPER PEMBATAS LEBAR 
+          max-w-[1200px] agar tidak full width layar 
+          mx-auto agar posisi di tengah
+      */}
+      <div className="w-full max-w-[1200px] mx-auto px-4">
         
-        {/* --- HEADER PAGE --- */}
-        <div className="flex justify-between items-center mb-6 px-1">
-            <h1 className="text-3xl font-bold text-black">Dashboard</h1>
+        {/* --- HEADER PAGE (JUDUL & TOMBOL IMPORT) --- */}
+        <div className="flex justify-between items-center mb-4 mt-2">
+            <h1 className="text-2xl font-bold text-black">Dashboard</h1>
             
-            {/* Tombol Import */}
+            {/* Tombol Import Kecil di Pojok Kanan Atas */}
             <Link href="/admin/import">
-            <button className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
+            <button className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-xs">
                 <UploadCloud size={16} />
                 Import File
             </button>
             </Link>
         </div>
 
-        {/* --- KOTAK PUTIH UTAMA (RINGKASAN) --- */}
-        {/* max-w-full agar mengikuti wrapper induk (6xl), tidak stretch ke 100vw */}
-        <div className="bg-white rounded-[1.5rem] p-8 shadow-sm mb-10 border border-gray-100">
+        {/* --- KOTAK PUTIH UTAMA (CONTAINER RINGKASAN) --- */}
+        <div className="bg-white rounded-[1.5rem] p-8 shadow-sm mb-8 border border-gray-100">
             
             {/* Header Dalam Kotak */}
-            <div className="flex justify-between items-start mb-8 border-b border-gray-50 pb-4">
+            <div className="flex justify-between items-start mb-8">
                 <div>
-                    <h2 className="text-xl font-bold text-[#005DAA] mb-2">Hazard Report</h2>
-                    <span className="border border-gray-300 text-gray-500 text-xs px-3 py-1 rounded-full font-medium">
+                    <h2 className="text-lg font-bold text-[#005DAA] mb-2">Hazard Report</h2>
+                    <span className="border border-gray-300 text-gray-500 text-[10px] px-3 py-1 rounded-full font-bold tracking-wide">
                         KAI DAOP 4
                     </span>
-                    <p className="text-[10px] text-gray-400 mt-2 font-medium">
-                        Last Updated : <br/> {lastUpdate}
+                    <p className="text-[10px] text-gray-400 mt-3 font-medium leading-relaxed">
+                        Last Updated : <br/> <span className="text-gray-600">{lastUpdate}</span>
                     </p>
                 </div>
                 
                 <div className="text-right">
-                    <span className="text-6xl font-black text-gray-800 tracking-tight">
+                    <span className="text-6xl font-black text-gray-800 tracking-tighter">
                         {summary.total}
                     </span>
-                    <p className="text-sm text-gray-500 font-medium mt-1">Total Hazard</p>
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Total Hazard</p>
                 </div>
             </div>
 
-            {/* Row Grafik Setengah Lingkaran (Grid lebih rapat) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Row 4 Grafik Setengah Lingkaran (Grid) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 <BigGauge label="New Hazard" pct={summary.pctOpen} color={COLORS.new} />
                 <BigGauge label="Open Hazard" pct={summary.pctOpen} color={COLORS.open} />
                 <BigGauge label="In Progress" pct={summary.pctProgress} color={COLORS.progress} />
@@ -163,13 +165,13 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* --- UNIT ANALYTICS (GRID BAWAH) --- */}
+        {/* --- BAGIAN BAWAH: UNIT ANALYTICS --- */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
             {unitsData.map((unit, idx) => (
             <div key={idx} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300">
                 
                 {/* Judul Unit */}
-                <h4 className="text-sm font-medium text-gray-600 mb-4 h-5 truncate">
+                <h4 className="text-sm font-bold text-gray-600 mb-4 h-5 truncate uppercase tracking-tight">
                     {unit.name}
                 </h4>
 
@@ -200,7 +202,7 @@ export default function Dashboard() {
                 </div>
                 </div>
 
-                {/* Legend Unit */}
+                {/* Legend Unit (Garis Warna) */}
                 <div className="flex justify-between items-end px-1 gap-2">
                     {/* Open */}
                     <div className="flex gap-1.5 items-center">
@@ -230,7 +232,7 @@ export default function Dashboard() {
                     </div>
                     
                     {/* Total */}
-                    <div className="flex gap-1.5 items-center border-l pl-2 border-gray-100">
+                    <div className="flex gap-1.5 items-center border-l pl-3 border-gray-100">
                         <div className="w-1 h-6 bg-gray-400 rounded-full"></div>
                         <div>
                             <span className="text-[9px] text-gray-400 block uppercase font-bold">Total</span>
@@ -251,12 +253,12 @@ export default function Dashboard() {
 function BigGauge({ label, pct, color }) {
     const data = [
         { value: pct, color: color },
-        { value: 100 - pct, color: '#e5e7eb' }
+        { value: 100 - pct, color: '#e5e7eb' } // Gray background part
     ];
 
     return (
         <div className="flex flex-col items-center">
-            <h3 className="text-lg font-bold text-gray-800 mb-2">{label}</h3>
+            <h3 className="text-md font-bold text-black mb-2">{label}</h3>
             <div className="relative w-40 h-24 flex justify-center items-end overflow-hidden">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -274,7 +276,7 @@ function BigGauge({ label, pct, color }) {
                 </ResponsiveContainer>
                 {/* Persentase di Tengah */}
                 <div className="absolute bottom-0 mb-1 text-center">
-                    <span className="text-xl font-bold text-gray-800">{pct}%</span>
+                    <span className="text-sm font-bold text-black">{pct}%</span>
                 </div>
             </div>
         </div>
