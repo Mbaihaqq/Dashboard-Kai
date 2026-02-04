@@ -12,10 +12,10 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState('');
   const [totalRows, setTotalRows] = useState(0);
 
-  // SKEMA WARNA
+  // SKEMA WARNA CHART
   const COLORS = {
     closed: '#22c55e',   // Hijau
-    progress: '#d946ef', // Pink/Ungu
+    progress: '#d946ef', // Pink/Ungu (Sesuai Visual)
     open: '#ef4444'      // Merah
   };
 
@@ -59,7 +59,7 @@ export default function Dashboard() {
       setTotalRows(allData.length);
       if (allData.length === 0) return;
 
-      // 2. Summary
+      // 2. Summary Header
       const totalOpen = allData.filter(d => d.status === 'Open').length;
       const totalProgress = allData.filter(d => d.status === 'Work In Progress').length;
       const totalClosed = allData.filter(d => d.status === 'Closed').length;
@@ -71,7 +71,7 @@ export default function Dashboard() {
         closed: totalClosed
       });
 
-      // 3. Unit Data
+      // 3. Unit Data Dinamis
       const allUniqueUnits = [...new Set(allData.map(item => item.unit?.trim()))].filter(Boolean);
 
       const formattedUnits = allUniqueUnits.map(unitName => {
@@ -88,7 +88,7 @@ export default function Dashboard() {
           total,
           completion,
           chartData: [
-            // Urutan: Open (Kiri), Progress (Tengah), Closed (Kanan)
+            // Urutan Chart: Open (Kiri), Progress (Tengah), Closed (Kanan)
             { name: 'Open', value: open, color: COLORS.open },
             { name: 'Progress', value: progress, color: COLORS.progress },
             { name: 'Closed', value: closed, color: COLORS.closed }
@@ -161,8 +161,8 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* CHART SETENGAH LINGKARAN (HALF CIRCLE) */}
-            <div className="relative w-full h-32 flex justify-center items-end overflow-hidden mb-2">
+            {/* CHART SETENGAH LINGKARAN */}
+            <div className="relative w-full h-32 flex justify-center items-end overflow-hidden mb-4">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -195,40 +195,36 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* LEGEND DETAIL DI BAWAH CIRCLE */}
-            <div className="flex justify-between items-center mt-2 px-1 border-t border-gray-50 pt-3">
+            {/* LEGEND DENGAN GARIS VERTIKAL (SESUAI REQUEST) */}
+            <div className="grid grid-cols-3 gap-2 border-t border-gray-50 pt-4">
+                
                 {/* OPEN */}
-                <div className="flex flex-col items-center w-1/3">
-                    <span className="text-lg font-black text-red-500 leading-tight">
-                        {unit.chartData[0].value}
-                    </span>
-                    <div className="flex items-center gap-1 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-8 bg-red-500 rounded-full"></div> {/* Garis */}
+                    <div>
+                        <span className="block text-lg font-black text-gray-800 leading-none">{unit.chartData[0].value}</span>
                         <span className="text-[9px] font-bold text-gray-400 uppercase">Open</span>
                     </div>
                 </div>
 
                 {/* PROGRESS */}
-                <div className="flex flex-col items-center w-1/3 border-l border-r border-gray-100">
-                    <span className="text-lg font-black text-[#d946ef] leading-tight">
-                        {unit.chartData[1].value}
-                    </span>
-                    <div className="flex items-center gap-1 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#d946ef]"></span>
+                <div className="flex items-center gap-2 justify-center border-l border-r border-gray-50 px-1">
+                    <div className="w-1.5 h-8 bg-[#d946ef] rounded-full"></div> {/* Garis */}
+                    <div>
+                        <span className="block text-lg font-black text-gray-800 leading-none">{unit.chartData[1].value}</span>
                         <span className="text-[9px] font-bold text-gray-400 uppercase">Prog</span>
                     </div>
                 </div>
 
                 {/* CLOSED */}
-                <div className="flex flex-col items-center w-1/3">
-                    <span className="text-lg font-black text-green-500 leading-tight">
-                        {unit.chartData[2].value}
-                    </span>
-                    <div className="flex items-center gap-1 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                <div className="flex items-center gap-2 justify-end">
+                    <div className="w-1.5 h-8 bg-green-500 rounded-full"></div> {/* Garis */}
+                    <div>
+                        <span className="block text-lg font-black text-gray-800 leading-none">{unit.chartData[2].value}</span>
                         <span className="text-[9px] font-bold text-gray-400 uppercase">Close</span>
                     </div>
                 </div>
+
             </div>
 
           </div>
