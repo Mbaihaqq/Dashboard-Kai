@@ -8,30 +8,25 @@ export default function Dashboard() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [unitsData, setUnitsData] = useState([]);
-  const [summary, setSummary] = useState({ open: 0, progress: 0, closed: 0, total: 0 });
+  const [summary, setSummary] = useState({ new: 0, open: 0, progress: 0, closed: 0 });
   const [lastUpdate, setLastUpdate] = useState('');
+  const [totalRows, setTotalRows] = useState(0);
 
-  // Skema Warna Status (Sesuai Standar Monitoring)
+  // SKEMA WARNA CHART (Colorful Style)
   const COLORS = {
-    closed: '#22c55e',   // Hijau (Selesai)
-    progress: '#F26522', // Oranye (Proses - Khas KAI)
-    open: '#ef4444'      // Merah (Belum Selesai)
+    closed: '#22c55e',   // Hijau (Closed)
+    progress: '#d946ef', // Pink/Ungu (In Progress - Sesuai style visual)
+    open: '#ef4444'      // Merah (Open)
   };
 
   useEffect(() => {
-    // Cek status login & role
     const loggedIn = sessionStorage.getItem('isLoggedIn');
-    const role = sessionStorage.getItem('userRole');
-
     if (!loggedIn) {
       router.push('/loginPage/login');
     } else {
       setIsAuthorized(true);
       fetchHazardStatistics();
-      
-      // Set tanggal update hari ini
-      const now = new Date();
-      setLastUpdate(now.toLocaleDateString('id-ID', { 
+      setLastUpdate(new Date().toLocaleDateString('id-ID', { 
         day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' 
       }));
     }
@@ -44,7 +39,7 @@ export default function Dashboard() {
       let to = 999;
       let hasMore = true;
 
-      // --- 1. AMBIL DATA TANPA BATAS (NO LIMIT) ---
+      // 1. TARIK SEMUA DATA (LOOPING NO LIMIT)
       while (hasMore) {
         const { data, error } = await supabase
           .from('hazards')
@@ -62,22 +57,23 @@ export default function Dashboard() {
         }
       }
 
+      setTotalRows(allData.length);
       if (allData.length === 0) return;
 
-      // --- 2. HITUNG RINGKASAN TOTAL (HEADER) ---
+      // 2. HITUNG SUMMARY (CARD WARNA-WARNI DI ATAS)
       const totalOpen = allData.filter(d => d.status === 'Open').length;
       const totalProgress = allData.filter(d => d.status === 'Work In Progress').length;
       const totalClosed = allData.filter(d => d.status === 'Closed').length;
 
       setSummary({
+        new: totalOpen, // Asumsi New = Open
         open: totalOpen,
         progress: totalProgress,
-        closed: totalClosed,
-        total: allData.length
+        closed: totalClosed
       });
 
-      // --- 3. HITUNG PER UNIT (DINAMIS MENGIKUTI EXCEL) ---
-      // Ambil semua nama unit unik dari data, hapus spasi berlebih
+      // 3. LOGIKA UNIT DINAMIS (TAMPILKAN SEMUA UNIT DARI EXCEL)
+      // Ambil nama unit unik, bersihkan spasi, filter yang kosong
       const allUniqueUnits = [...new Set(allData.map(item => item.unit?.trim()))].filter(Boolean);
 
       const formattedUnits = allUniqueUnits.map(unitName => {
@@ -87,7 +83,7 @@ export default function Dashboard() {
         const progress = unitItems.filter(d => d.status === 'Work In Progress').length;
         const open = unitItems.filter(d => d.status === 'Open').length;
         
-        // Hitung TL% (Persentase Penyelesaian)
+        // Rumus Persentase
         const completion = total > 0 ? Math.round((closed / total) * 100) : 0;
 
         return {
@@ -102,7 +98,7 @@ export default function Dashboard() {
         };
       });
 
-      // Urutkan nama unit dari A-Z agar rapi
+      // Urutkan Unit A-Z
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
 
     } catch (error) {
@@ -110,95 +106,93 @@ export default function Dashboard() {
     }
   };
 
-  if (!isAuthorized) return <div className="h-screen bg-[#F3F4F6]"></div>;
+  if (!isAuthorized) return <div className="h-screen bg-[#F8F9FA]"></div>;
 
   return (
     <Layout>
-      {/* --- HEADER DASHBOARD --- */}
-      <div className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-gray-300 pb-4">
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-gray-200 pb-4">
         <div>
-          <h1 className="text-3xl font-black text-[#005DAA] uppercase tracking-tighter">
-            Hazard Report
-          </h1>
-          <p className="text-sm font-bold text-gray-500 mt-1 tracking-wide">
-            DAOP 4 SEMARANG MONITORING SYSTEM
-          </p>
+           <div className="flex items-center gap-2 mb-1">
+             <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                Admin Dashboard
+             </span>
+           </div>
+           <h1 className="text-3xl font-black text-[#005DAA] uppercase tracking-tighter">
+             Hazard Report
+           </h1>
+           <p className="text-sm text-gray-400 font-bold tracking-wide">
+             DAOP 4 SEMARANG MONITORING SYSTEM
+           </p>
         </div>
-        <div className="text-right mt-4 md:mt-0">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Last Update</p>
-          <p className="text-sm font-bold text-[#005DAA]">{lastUpdate}</p>
+        
+        <div className="text-right">
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Last Update</p>
+            <p className="text-sm font-bold text-[#005DAA]">{lastUpdate}</p>
+            <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold mt-1 inline-block">
+               Total: {totalRows.toLocaleString()} Data
+            </span>
         </div>
       </div>
 
-      {/* --- SUMMARY CARDS (ATAS) --- */}
+      {/* SUMMARY CARDS (STYLE WARNA-WARNI) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
         <SummaryCard 
-          title="Total Temuan" 
-          value={summary.total} 
-          bg="bg-[#005DAA]" 
-          text="text-white"
+          title="New Hazard" value={summary.new} 
+          subtitle="Hazard Baru"
+          bg="bg-pink-50" text="text-pink-600" 
         />
         <SummaryCard 
-          title="Open Hazard" 
-          value={summary.open} 
-          bg="bg-red-50" 
-          text="text-red-600" 
-          border="border-red-100"
+          title="Open Hazard" value={summary.open} 
+          subtitle="Belum Ditindaklanjuti"
+          bg="bg-orange-50" text="text-orange-600" 
         />
         <SummaryCard 
-          title="In Progress" 
-          value={summary.progress} 
-          bg="bg-orange-50" 
-          text="text-[#F26522]" 
-          border="border-orange-100"
+          title="In Progress" value={summary.progress} 
+          subtitle="Sedang Proses"
+          bg="bg-purple-50" text="text-purple-600" 
         />
         <SummaryCard 
-          title="Closed Hazard" 
-          value={summary.closed} 
-          bg="bg-green-50" 
-          text="text-green-600" 
-          border="border-green-100"
+          title="Closed Hazard" value={summary.closed} 
+          subtitle="Selesai"
+          bg="bg-green-50" text="text-green-600" 
         />
       </div>
 
-      {/* --- JUDUL UNIT SECTION --- */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className="h-6 w-1 bg-[#F26522]"></div>
-        <h3 className="text-lg font-black text-gray-800 uppercase italic">
-          Unit Analytics
+      {/* GRID UNIT (DINAMIS 12+ CARD) */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="h-6 w-1 bg-[#005DAA] rounded-full"></div>
+        <h3 className="text-xl font-black text-gray-800 uppercase italic">
+           Unit Analytics
         </h3>
-        <span className="bg-gray-200 text-gray-600 text-[10px] px-2 py-1 rounded font-bold ml-2">
-           {unitsData.length} Units
+        <span className="bg-[#005DAA] text-white text-[10px] px-2 py-1 rounded-full font-bold">
+            {unitsData.length} Units Found
         </span>
       </div>
 
-      {/* --- GRID UNIT (CARD) --- */}
-      {/* Grid akan otomatis menyesuaikan jumlah unit */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-12">
         {unitsData.map((unit, idx) => (
-          <div 
-            key={idx} 
-            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 hover:shadow-xl transition-all duration-300 relative group"
-          >
-            {/* Nama Unit & Total */}
+          <div key={idx} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 group">
+            
+            {/* Header Card */}
             <div className="flex justify-between items-start mb-2 h-10">
-                <h4 className="text-xs font-black text-[#005DAA] uppercase leading-tight w-3/4 line-clamp-2 group-hover:text-[#F26522] transition-colors">
+                <h4 className="text-xs font-black text-[#005DAA] uppercase italic leading-tight w-3/4 line-clamp-2">
                     {unit.name}
                 </h4>
                 <div className="text-right">
-                    <span className="text-xs font-bold text-gray-700 block">{unit.total}</span>
+                    <span className="text-xs font-black text-gray-700 block">{unit.total}</span>
                     <span className="text-[8px] text-gray-400 uppercase block">Total</span>
                 </div>
             </div>
 
-            {/* Grafik Donut */}
-            <div className="relative w-36 h-36 mx-auto my-3">
+            {/* Chart Area */}
+            <div className="relative w-40 h-40 mx-auto my-3">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={unit.chartData}
-                    innerRadius={48}
-                    outerRadius={65}
+                    innerRadius={50}
+                    outerRadius={68}
                     paddingAngle={3}
                     dataKey="value"
                     stroke="none"
@@ -210,32 +204,36 @@ export default function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
               
-              {/* Persentase TL% di Tengah */}
+              {/* Persentase di Tengah */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className={`text-3xl font-black ${unit.completion === 100 ? 'text-green-600' : 'text-gray-800'}`}>
+                <span className="text-3xl font-black text-gray-800 leading-none group-hover:scale-110 transition-transform">
                     {unit.completion}%
                 </span>
-                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                <span className="text-[9px] font-black text-gray-400 uppercase mt-1 tracking-widest">
                     TL%
                 </span>
               </div>
             </div>
 
-            {/* Legend / Detail Status */}
-            <div className="grid grid-cols-3 gap-1 text-center border-t border-gray-100 pt-3 mt-2">
-                <div>
-                    <span className="block text-xs font-bold text-red-500">{unit.chartData[2].value}</span>
+            {/* Legend Bawah */}
+            <div className="grid grid-cols-3 gap-1 text-center border-t border-gray-50 pt-3 mt-2">
+                <div className="flex flex-col items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 mb-1"></span>
+                    <span className="text-xs font-bold text-gray-600">{unit.chartData[2].value}</span>
                     <span className="text-[8px] font-bold text-gray-400 uppercase">Open</span>
                 </div>
-                <div>
-                    <span className="block text-xs font-bold text-[#F26522]">{unit.chartData[1].value}</span>
+                <div className="flex flex-col items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#d946ef] mb-1"></span>
+                    <span className="text-xs font-bold text-gray-600">{unit.chartData[1].value}</span>
                     <span className="text-[8px] font-bold text-gray-400 uppercase">Prog</span>
                 </div>
-                <div>
-                    <span className="block text-xs font-bold text-green-500">{unit.chartData[0].value}</span>
+                <div className="flex flex-col items-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 mb-1"></span>
+                    <span className="text-xs font-bold text-gray-600">{unit.chartData[0].value}</span>
                     <span className="text-[8px] font-bold text-gray-400 uppercase">Close</span>
                 </div>
             </div>
+
           </div>
         ))}
       </div>
@@ -243,15 +241,18 @@ export default function Dashboard() {
   );
 }
 
-// Komponen Kartu Ringkasan
-function SummaryCard({ title, value, bg, text, border = "border-transparent" }) {
+// Komponen Kartu Summary
+function SummaryCard({ title, value, subtitle, bg, text }) {
   return (
-    <div className={`${bg} border ${border} p-5 rounded-2xl shadow-sm flex flex-col justify-center min-h-[110px]`}>
-      <span className={`text-4xl font-black ${text} mb-1`}>
+    <div className={`${bg} p-6 rounded-[2rem] shadow-sm flex flex-col justify-center min-h-[120px] hover:scale-105 transition-transform duration-200`}>
+      <span className={`text-4xl font-black ${text} mb-1 block`}>
         {value.toLocaleString('id-ID')}
       </span>
-      <span className={`text-[10px] font-black uppercase tracking-widest opacity-80 ${text === 'text-white' ? 'text-blue-100' : 'text-gray-500'}`}>
+      <span className={`text-xs font-black ${text} opacity-80 uppercase tracking-widest block mb-1`}>
         {title}
+      </span>
+      <span className={`text-[10px] ${text} opacity-60 font-medium`}>
+        {subtitle}
       </span>
     </div>
   );
