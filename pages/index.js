@@ -15,7 +15,7 @@ export default function Dashboard() {
   // SKEMA WARNA CHART
   const COLORS = {
     closed: '#22c55e',   // Hijau
-    progress: '#d946ef', // Pink/Ungu (Sesuai Visual)
+    progress: '#d946ef', // Pink/Ungu
     open: '#ef4444'      // Merah
   };
 
@@ -88,7 +88,7 @@ export default function Dashboard() {
           total,
           completion,
           chartData: [
-            // Urutan Chart: Open (Kiri), Progress (Tengah), Closed (Kanan)
+            // Urutan: Open (Kiri), Progress (Tengah), Closed (Kanan)
             { name: 'Open', value: open, color: COLORS.open },
             { name: 'Progress', value: progress, color: COLORS.progress },
             { name: 'Closed', value: closed, color: COLORS.closed }
@@ -125,9 +125,6 @@ export default function Dashboard() {
         <div className="text-right">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Last Update</p>
             <p className="text-sm font-bold text-[#005DAA]">{lastUpdate}</p>
-            <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold mt-1 inline-block">
-               Total: {totalRows.toLocaleString()} Data
-            </span>
         </div>
       </div>
 
@@ -148,21 +145,17 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-12">
         {unitsData.map((unit, idx) => (
-          <div key={idx} className="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all duration-300 group">
+          <div key={idx} className="bg-white p-5 rounded-[1.5rem] shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group">
             
-            {/* Header: Nama Unit & Total */}
-            <div className="flex justify-between items-start mb-2 h-10">
-                <h4 className="text-xs font-black text-[#005DAA] uppercase italic leading-tight w-3/4 line-clamp-2">
+            {/* Header: Nama Unit (Clean) */}
+            <div className="mb-2 h-8 flex items-center">
+                <h4 className="text-sm font-bold text-[#005DAA] uppercase leading-tight line-clamp-2">
                     {unit.name}
                 </h4>
-                <div className="text-right">
-                    <span className="text-xs font-black text-gray-700 block">{unit.total}</span>
-                    <span className="text-[8px] text-gray-400 uppercase block">Total</span>
-                </div>
             </div>
 
             {/* CHART SETENGAH LINGKARAN */}
-            <div className="relative w-full h-32 flex justify-center items-end overflow-hidden mb-4">
+            <div className="relative w-full h-28 flex justify-center items-end overflow-hidden mb-2">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -171,8 +164,8 @@ export default function Dashboard() {
                     cy="100%"  
                     startAngle={180} 
                     endAngle={0}     
-                    innerRadius={60}
-                    outerRadius={90}
+                    innerRadius={55}
+                    outerRadius={80}
                     paddingAngle={2}
                     dataKey="value"
                     stroke="none"
@@ -184,47 +177,53 @@ export default function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
               
-              {/* Persentase di Tengah Busur */}
-              <div className="absolute bottom-0 mb-2 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-3xl font-black text-gray-800 leading-none group-hover:scale-110 transition-transform">
+              {/* Persentase di Tengah Busur (Font Dikecilkan) */}
+              <div className="absolute bottom-0 mb-1 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-2xl font-bold text-gray-800 leading-none group-hover:scale-105 transition-transform">
                     {unit.completion}%
                 </span>
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
                     TL%
                 </span>
               </div>
             </div>
 
-            {/* LEGEND DENGAN GARIS VERTIKAL (SESUAI REQUEST) */}
-            <div className="grid grid-cols-3 gap-2 border-t border-gray-50 pt-4">
+            {/* LEGEND DENGAN GARIS VERTIKAL (Font Lebih Rapi) */}
+            <div className="grid grid-cols-3 gap-2 border-t border-gray-100 pt-3 pb-2">
                 
                 {/* OPEN */}
-                <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-8 bg-red-500 rounded-full"></div> {/* Garis */}
+                <div className="flex items-center gap-1.5">
+                    <div className="w-1 h-6 bg-red-500 rounded-full"></div>
                     <div>
-                        <span className="block text-lg font-black text-gray-800 leading-none">{unit.chartData[0].value}</span>
-                        <span className="text-[9px] font-bold text-gray-400 uppercase">Open</span>
+                        <span className="block text-sm font-bold text-gray-700 leading-none">{unit.chartData[0].value}</span>
+                        <span className="text-[8px] font-bold text-gray-400 uppercase">Open</span>
                     </div>
                 </div>
 
                 {/* PROGRESS */}
-                <div className="flex items-center gap-2 justify-center border-l border-r border-gray-50 px-1">
-                    <div className="w-1.5 h-8 bg-[#d946ef] rounded-full"></div> {/* Garis */}
+                <div className="flex items-center gap-1.5 justify-center border-l border-r border-gray-50 px-1">
+                    <div className="w-1 h-6 bg-[#d946ef] rounded-full"></div>
                     <div>
-                        <span className="block text-lg font-black text-gray-800 leading-none">{unit.chartData[1].value}</span>
-                        <span className="text-[9px] font-bold text-gray-400 uppercase">Prog</span>
+                        <span className="block text-sm font-bold text-gray-700 leading-none">{unit.chartData[1].value}</span>
+                        <span className="text-[8px] font-bold text-gray-400 uppercase">Prog</span>
                     </div>
                 </div>
 
                 {/* CLOSED */}
-                <div className="flex items-center gap-2 justify-end">
-                    <div className="w-1.5 h-8 bg-green-500 rounded-full"></div> {/* Garis */}
+                <div className="flex items-center gap-1.5 justify-end">
+                    <div className="w-1 h-6 bg-green-500 rounded-full"></div>
                     <div>
-                        <span className="block text-lg font-black text-gray-800 leading-none">{unit.chartData[2].value}</span>
-                        <span className="text-[9px] font-bold text-gray-400 uppercase">Close</span>
+                        <span className="block text-sm font-bold text-gray-700 leading-none">{unit.chartData[2].value}</span>
+                        <span className="text-[8px] font-bold text-gray-400 uppercase">Close</span>
                     </div>
                 </div>
+            </div>
 
+            {/* TOTAL DI BAWAH (Footer Card) */}
+            <div className="mt-1 pt-2 border-t border-gray-50 text-center">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    Total Data: <span className="text-[#005DAA]">{unit.total}</span>
+                </span>
             </div>
 
           </div>
@@ -237,14 +236,14 @@ export default function Dashboard() {
 // Komponen Kartu Summary
 function SummaryCard({ title, value, subtitle, bg, text }) {
   return (
-    <div className={`${bg} p-6 rounded-[2rem] shadow-sm flex flex-col justify-center min-h-[120px] hover:scale-105 transition-transform duration-200`}>
-      <span className={`text-4xl font-black ${text} mb-1 block`}>
+    <div className={`${bg} p-5 rounded-[1.5rem] shadow-sm flex flex-col justify-center min-h-[100px] hover:scale-105 transition-transform duration-200`}>
+      <span className={`text-3xl font-black ${text} mb-0.5 block`}>
         {value.toLocaleString('id-ID')}
       </span>
-      <span className={`text-xs font-black ${text} opacity-80 uppercase tracking-widest block mb-1`}>
+      <span className={`text-[10px] font-bold ${text} opacity-80 uppercase tracking-widest block mb-0.5`}>
         {title}
       </span>
-      <span className={`text-[10px] ${text} opacity-60 font-medium`}>
+      <span className={`text-[9px] ${text} opacity-60 font-medium`}>
         {subtitle}
       </span>
     </div>
