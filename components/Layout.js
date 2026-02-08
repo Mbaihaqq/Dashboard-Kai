@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { Search, Menu, X, ChevronDown, LayoutDashboard, BarChart3 } from 'lucide-react';
+import { Search, Menu, X, ChevronDown, LayoutDashboard, BarChart3, History, Users } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 export default function Layout({ children }) {
@@ -114,30 +114,43 @@ export default function Layout({ children }) {
       </nav>
 
       {/* --- BARIS 2: NAVIGATION BAR (HANYA UNTUK ADMIN) --- */}
-      {/* User TIDAK AKAN melihat bar oranye ini sama sekali */}
+      {/* UPDATE DI SINI: Link diarahkan ke file yang benar */}
       {role === 'admin' && (
         <div className="bg-[#E85D18] shadow-md relative z-40 hidden md:block">
             <div className="w-full px-8 flex items-center gap-1 h-12">
+                
+                {/* MENU 1: DASHBOARD */}
                 <Link href="/">
-                    <div className={`px-6 py-1.5 rounded text-sm font-bold cursor-pointer transition-all ${router.pathname === '/' ? 'bg-[#1F2937] text-white shadow-lg' : 'text-white hover:bg-white/10'}`}>
+                    <div className={`px-6 py-1.5 rounded text-sm font-bold cursor-pointer transition-all flex items-center gap-2 ${router.pathname === '/' ? 'bg-[#1F2937] text-white shadow-lg' : 'text-white hover:bg-white/10'}`}>
+                        <LayoutDashboard size={16} />
                         Dashboard
                     </div>
                 </Link>
-                <Link href="#"> 
-                    <div className="px-6 py-1.5 text-white font-semibold text-sm hover:bg-white/10 rounded transition-all cursor-pointer">
-                        TL % Analitics
+                
+                {/* MENU 2: TL% ANALYTICS */}
+                <Link href="/tl-analytics"> 
+                    <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer flex items-center gap-2 ${router.pathname === '/tl-analytics' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
+                        <BarChart3 size={16} />
+                        TL % Analytics
                     </div>
                 </Link>
-                <Link href="/admin/import">
-                    <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer ${router.pathname === '/admin/import' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
+                
+                {/* MENU 3: HISTORY (PERBAIKAN LINK) */}
+                <Link href="/history">
+                    <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer flex items-center gap-2 ${router.pathname === '/history' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
+                        <History size={16} />
                         Histori Penginputan Data
                     </div>
                 </Link>
+                
+                {/* MENU 4: APPROVAL (OPSIONAL) */}
                 <Link href="/admin/approval">
-                    <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer ${router.pathname === '/admin/approval' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
+                    <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer flex items-center gap-2 ${router.pathname === '/admin/approval' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
+                        <Users size={16} />
                         Permohonan Akun
                     </div>
                 </Link>
+
             </div>
         </div>
       )}
