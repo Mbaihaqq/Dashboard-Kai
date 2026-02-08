@@ -95,7 +95,7 @@ export default function HistoryPage() {
                 </button>
                 <div>
                     <h1 className="text-xl font-bold text-gray-800 tracking-tight">Riwayat Penginputan</h1>
-                    <p className="text-xs text-gray-500">Log aktivitas impor data hazard.</p>
+                    <p className="text-xs text-gray-500"></p>
                 </div>
             </div>
 
