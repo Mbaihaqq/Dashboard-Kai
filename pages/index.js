@@ -6,17 +6,20 @@ import DetailGrafik from '../components/DetailGrafik';
 import DetailHazard from '../components/DetailHazard'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
-import { UploadCloud, X, FileSpreadsheet, ChevronDown, LayoutDashboard, BarChart3, Loader2, History } from 'lucide-react';
+import { UploadCloud, X, FileSpreadsheet, History } from 'lucide-react'; // Hapus yang tidak perlu
 import * as XLSX from 'xlsx'; 
 
 export default function Dashboard() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
   
+  // --- STATE USER INFO ---
+  const [userRole, setUserRole] = useState(null); 
+  const [currentUserEmail, setCurrentUserEmail] = useState(''); // <--- STATE BARU UNTUK EMAIL
+
   // --- STATE DATA ---
   const [unitsData, setUnitsData] = useState([]);
   const [hazardData, setHazardData] = useState([]); 
-  const [userRole, setUserRole] = useState(null); 
 
   // --- STATE MODALS ---
   const [isModalOpen, setIsModalOpen] = useState(false); 
@@ -41,23 +44,39 @@ export default function Dashboard() {
   const formatDateTime = (date) => new Date(date).toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
 
   useEffect(() => {
-    const loggedIn = sessionStorage.getItem('isLoggedIn');
-    if (!loggedIn) {
-      router.push('/loginPage/login');
-    } else {
-      setIsAuthorized(true);
-      setUserRole(sessionStorage.getItem('userRole'));
-      
-      fetchHazardStatistics();
+    const checkSession = async () => {
+        // 1. Cek Login Session Storage
+        const loggedIn = sessionStorage.getItem('isLoggedIn');
+        if (!loggedIn) {
+            router.push('/loginPage/login');
+            return;
+        }
 
-      const savedDate = localStorage.getItem('last_update_fixed');
-      if (savedDate) setLastUpdate(savedDate);
-      else {
-        const initialDate = formatDateTime(new Date());
-        setLastUpdate(initialDate);
-        localStorage.setItem('last_update_fixed', initialDate);
-      }
-    }
+        setIsAuthorized(true);
+        setUserRole(sessionStorage.getItem('userRole'));
+
+        // 2. AMBIL EMAIL DARI SUPABASE AUTH (Supaya tidak terbaca 'Admin' terus)
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.email) {
+            setCurrentUserEmail(user.email);
+        } else {
+            // Fallback kalau auth supabase null (misal login bypass), coba ambil dari storage
+            const emailStorage = sessionStorage.getItem('userEmail'); // Pastikan saat login, email juga disimpan di sessionStorage
+            setCurrentUserEmail(emailStorage || 'Unknown User');
+        }
+
+        // 3. Load Data Dashboard
+        fetchHazardStatistics();
+        const savedDate = localStorage.getItem('last_update_fixed');
+        if (savedDate) setLastUpdate(savedDate);
+        else {
+            const initialDate = formatDateTime(new Date());
+            setLastUpdate(initialDate);
+            localStorage.setItem('last_update_fixed', initialDate);
+        }
+    };
+
+    checkSession();
   }, [router]);
 
   // --- 1. NORMALISASI DATA ---
@@ -132,7 +151,7 @@ export default function Dashboard() {
 
   const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
-  // --- HANDLER UPLOAD & CATAT HISTORY ---
+  // --- HANDLER UPLOAD ---
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
@@ -152,11 +171,12 @@ export default function Dashboard() {
                 return;
             }
 
+            // 1. Data Processing
             const formattedData = jsonData.map(normalizeData);
             const totalRows = formattedData.length;
             const batchSize = 500; 
 
-            // 1. Upload Data (Batching)
+            // 2. Upload (Batching)
             for (let i = 0; i < totalRows; i += batchSize) {
                 const batch = formattedData.slice(i, i + batchSize);
                 const { error } = await supabase.from('hazards').upsert(batch, { onConflict: 'no_pelaporan' });
@@ -164,15 +184,18 @@ export default function Dashboard() {
                 setUploadProgress(Math.round(((i + batch.length) / totalRows) * 100));
             }
 
-            // 2. CATAT KE DB HISTORY (PENTING: Biar muncul di halaman History)
+            // 3. CATAT KE HISTORY (PENTING: Pakai variable state currentUserEmail)
+            // Pastikan tidak kosong/null
+            const finalUploaderName = currentUserEmail && currentUserEmail !== '' ? currentUserEmail : (userRole || 'Admin System');
+
             const { error: historyError } = await supabase.from('upload_history').insert({
-                admin_name: userRole || 'Admin',
+                admin_name: finalUploaderName, 
                 file_name: selectedFile.name,
                 total_rows: totalRows
             });
             if (historyError) console.error("Gagal catat history:", historyError);
 
-            // 3. Selesai
+            // 4. Update UI
             const now = formatDateTime(new Date());
             setLastUpdate(now); 
             localStorage.setItem('last_update_fixed', now); 
@@ -249,7 +272,13 @@ export default function Dashboard() {
             
             {userRole === 'admin' && (
                 <div className="flex gap-3">
-                    {/* TOMBOL IMPORT (Buka Modal) */}
+                    <button 
+                        onClick={() => router.push('/History')} 
+                        className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
+                    >
+                        <History size={16} /> Riwayat Upload
+                    </button>
+
                     <button 
                         onClick={() => setIsModalOpen(true)} 
                         className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
@@ -306,7 +335,7 @@ export default function Dashboard() {
 
       </div>
 
-      {/* --- MODAL 1: IMPORT FILE --- */}
+      {/* --- MODALS --- */}
       {userRole === 'admin' && isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
             <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
@@ -320,7 +349,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* --- MODAL 2: DETAIL TABLE --- */}
       <DetailGrafik 
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
@@ -329,7 +357,6 @@ export default function Dashboard() {
         onRowClick={handleRowClick} 
       />
 
-      {/* --- MODAL 3: DETAIL HAZARD --- */}
       <DetailHazard 
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
