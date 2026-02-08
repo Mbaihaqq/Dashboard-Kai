@@ -25,7 +25,7 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data }) {
                     <span className="bg-blue-50 text-[#005DAA] text-xs px-2.5 py-0.5 rounded-full font-bold border border-blue-100">
                         {data.length} Data Found
                     </span>
-                    <span className="text-gray-400 text-xs">Detail Hazard Report List</span>
+                    <span className="text-gray-400 text-xs">Detail Hazard Report List (Active Only)</span>
                 </div>
             </div>
             <button 
@@ -56,6 +56,7 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data }) {
                             data.map((row, idx) => (
                                 <tr key={idx} className="hover:bg-blue-50/30 transition-colors group">
                                     <td className="px-6 py-4 text-center font-medium text-gray-500">{idx + 1}</td>
+                                    {/* Menggunakan fallback OR (||) untuk handle nama kolom besar/kecil dari Excel */}
                                     <td className="px-6 py-4 font-bold text-gray-700 whitespace-nowrap">
                                         {row['no. pelaporan'] || row['No. Pelaporan'] || '-'}
                                     </td>
@@ -98,7 +99,7 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data }) {
                         ) : (
                             <tr>
                                 <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
-                                    Tidak ada data hazard untuk unit ini.
+                                    Tidak ada data aktif (Open/In Progress) untuk unit ini.
                                 </td>
                             </tr>
                         )}

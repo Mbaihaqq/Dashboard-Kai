@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout from '../components/Layout';
-// UPDATE IMPORT DI SINI:
 import DetailGrafik from '../components/DetailGrafik'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
@@ -14,18 +13,18 @@ export default function Dashboard() {
   
   // --- STATE DATA ---
   const [unitsData, setUnitsData] = useState([]);
-  const [hazardData, setHazardData] = useState([]); // Data mentah untuk tabel detail
+  const [hazardData, setHazardData] = useState([]); // Data mentah (akan auto-update saat fetch ulang)
   
   // --- STATE VIEW & ROLE ---
   const [userRole, setUserRole] = useState(null); 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false); 
   const [selectedView, setSelectedView] = useState('Dashboard'); 
 
-  // --- STATE MODAL IMPORT & DETAIL ---
-  const [isModalOpen, setIsModalOpen] = useState(false); // Modal Import
-  
-  // State untuk Modal Detail Unit (Pop-up Tabel)
+  // --- STATE MODAL ---
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  
+  // State Data Pop-up
   const [selectedUnitName, setSelectedUnitName] = useState('');
   const [selectedUnitRows, setSelectedUnitRows] = useState([]);
 
@@ -41,7 +40,6 @@ export default function Dashboard() {
     total: 0
   });
 
-  // SKEMA WARNA
   const COLORS = {
     new: '#ef4444', open: '#f59e0b', progress: '#10b981', closed: '#8b5cf6', empty: '#e5e7eb'
   };
@@ -88,7 +86,7 @@ export default function Dashboard() {
         if (data && data.length > 0) { allData = [...allData, ...data]; from += 1000; to += 1000; } else { hasMore = false; }
       }
 
-      setHazardData(allData); // Simpan data mentah untuk pop-up detail
+      setHazardData(allData); // Simpan semua data terbaru ke state
 
       const grandTotal = allData.length;
       if (grandTotal === 0) return;
@@ -132,12 +130,20 @@ export default function Dashboard() {
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
+    
+    // Disini logika upload ke server/supabase Anda...
+    
     setTimeout(() => {
         setIsUploading(false);
         const now = formatDateTime(new Date());
         setLastUpdate(now); 
         localStorage.setItem('last_update_fixed', now); 
+        
         alert(`File ${selectedFile.name} berhasil diupload!`);
+        
+        // PENTING: Panggil fetch ulang agar data hazardData terupdate dengan file baru
+        fetchHazardStatistics(); 
+        
         setIsModalOpen(false);
         setSelectedFile(null);
     }, 1500);
@@ -145,15 +151,26 @@ export default function Dashboard() {
 
   const handleViewChange = (viewName, path) => { setSelectedView(viewName); setIsDropdownOpen(false); };
 
-  // --- HANDLER KLIK UNIT (Membuka Pop-up Tabel) ---
+  // --- HANDLER KLIK UNIT (DENGAN FILTER STATUS) ---
   const handleUnitClick = (unitName) => {
-    // Filter data mentah berdasarkan unit
-    const rows = hazardData.filter(item => item.unit?.trim() === unitName);
-    // Sortir tanggal terbaru
-    rows.sort((a, b) => new Date(b['tanggal hazard']) - new Date(a['tanggal hazard']));
+    // 1. Ambil semua data milik unit ini
+    const unitRows = hazardData.filter(item => item.unit?.trim() === unitName);
+    
+    // 2. FILTER: Hanya ambil status 'Open' atau 'Work In Progress'
+    const filteredRows = unitRows.filter(row => {
+        const status = row.status || row['Status']; // Handle kemungkinan nama kolom beda
+        return status === 'Open' || status === 'Work In Progress';
+    });
+
+    // 3. Sortir berdasarkan tanggal (Terbaru di atas)
+    filteredRows.sort((a, b) => {
+        const dateA = a['tanggal hazard'] || a['Tanggal Hazard'];
+        const dateB = b['tanggal hazard'] || b['Tanggal Hazard'];
+        return new Date(dateB) - new Date(dateA);
+    });
     
     setSelectedUnitName(unitName);
-    setSelectedUnitRows(rows);
+    setSelectedUnitRows(filteredRows); // Set data yang sudah difilter ke modal
     setIsDetailModalOpen(true);
   };
 
@@ -163,17 +180,15 @@ export default function Dashboard() {
     <Layout>
       <div className="w-full px-6 py-4">
         
-        {/* --- HEADER PAGE (USER vs ADMIN) --- */}
+        {/* --- HEADER PAGE --- */}
         <div className="flex justify-between items-center mb-6 relative">
             <h1 className="text-3xl font-bold text-black">Dashboard</h1>
             
             {userRole === 'admin' ? (
-                /* Admin: Tombol Import */
                 <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
                     <UploadCloud size={16} /> Import File
                 </button>
             ) : (
-                /* User: Dropdown Menu */
                 <div className="relative">
                     <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-3 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 px-4 py-2 rounded-lg shadow-sm transition-all text-sm font-medium min-w-[160px] justify-between">
                         <div className="flex items-center gap-2"><LayoutDashboard size={16} /><span>{selectedView}</span></div>
@@ -212,14 +227,14 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* --- UNIT ANALYTICS (KLIK UNTUK DETAIL) --- */}
+        {/* --- UNIT ANALYTICS --- */}
         <div className="w-full">
             <h3 className="text-xl font-bold text-gray-700 mb-6 border-l-4 border-[#005DAA] pl-3">Detail Unit ({unitsData.length})</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-12">
                 {unitsData.map((unit, idx) => (
                 <div 
                     key={idx} 
-                    onClick={() => handleUnitClick(unit.name)} // FUNGSI KLIK
+                    onClick={() => handleUnitClick(unit.name)} // KLIK DISINI MEMICU FILTER & BUKA MODAL
                     className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300 cursor-pointer group relative hover:-translate-y-1"
                 >
                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -254,7 +269,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* --- MODAL 2: DETAIL UNIT TABLE (FITUR BARU) - Menggunakan Komponen Terpisah --- */}
+      {/* --- MODAL 2: DETAIL UNIT TABLE --- */}
       <DetailGrafik 
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
