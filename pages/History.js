@@ -37,15 +37,12 @@ export default function HistoryPage() {
 
   // --- FUNGSI HAPUS SATU PER SATU ---
   const handleDelete = async (id, fileName) => {
-    // 1. Konfirmasi User dulu biar gak salah hapus
     const confirmDelete = window.confirm(`Apakah Anda yakin ingin menghapus log untuk file "${fileName}"? Data ini tidak bisa dikembalikan.`);
     
     if (!confirmDelete) return;
 
     try {
         setIsDeleting(true);
-        
-        // 2. Hapus dari Database Supabase
         const { error } = await supabase
             .from('upload_history')
             .delete()
@@ -53,7 +50,6 @@ export default function HistoryPage() {
 
         if (error) throw error;
 
-        // 3. Update Tampilan (Hapus dari state lokal biar langsung hilang)
         setHistoryData(prevData => prevData.filter(item => item.id !== id));
         alert("Data berhasil dihapus.");
 
@@ -106,14 +102,15 @@ export default function HistoryPage() {
             {/* SEARCH BAR */}
             <div className="relative w-full md:w-80">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search size={16} className="text-black-400" />
+                    <Search size={16} className="text-gray-400" />
                 </div>
                 <input 
                     type="text" 
                     placeholder="Cari admin atau nama file..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#005DAA] focus:border-[#005DAA] sm:text-sm transition-all shadow-sm"
+                    // PERUBAHAN DISINI: text-gray-900 (Hitam Pekat) menggantikan warna default
+                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-lg leading-5 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#005DAA] focus:border-[#005DAA] sm:text-sm transition-all shadow-sm"
                 />
             </div>
         </div>
