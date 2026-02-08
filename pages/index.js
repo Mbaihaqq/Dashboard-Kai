@@ -7,7 +7,7 @@ import DetailHazard from '../components/DetailHazard';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
 import { UploadCloud, X, FileSpreadsheet, ChevronDown, LayoutDashboard, BarChart3, Loader2 } from 'lucide-react';
-import * as XLSX from 'xlsx'; // Pastikan install: npm install xlsx
+import * as XLSX from 'xlsx'; // Pastikan sudah install: npm install xlsx
 
 export default function Dashboard() {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function Dashboard() {
   // State Upload
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0); // Indikator Progress
+  const [uploadProgress, setUploadProgress] = useState(0); 
   const [lastUpdate, setLastUpdate] = useState(''); 
 
   const [summary, setSummary] = useState({ open: 0, pctOpen: 0, progress: 0, pctProgress: 0, closed: 0, pctClosed: 0, total: 0 });
@@ -60,44 +60,24 @@ export default function Dashboard() {
     }
   }, [router]);
 
-  // --- 1. NORMALISASI DATA (Mapping Excel -> Database Lengkap) ---
+  // --- 1. NORMALISASI DATA (Agar ID & Kolom selalu terbaca) ---
   const normalizeData = (rawItem) => {
     return {
-        // --- 1. Identitas Laporan ---
-        no_pelaporan: rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['no_pelaporan'] || `UNKNOWN-${Math.random()}`,
+        // ID Unik (Cek berbagai kemungkinan header Excel)
+        no_pelaporan: rawItem['no_pelaporan'] || rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['report_no'] || `UNKNOWN-${Math.random()}`,
         
-        // --- 2. Tanggal (Ambil apa adanya dari Excel) ---
-        tanggal_input_hazard: rawItem['Tanggal Input Hazard'] || '-',
-        tanggal_hazard: rawItem['Tanggal Hazard'] || rawItem['Tanggal'] || null,
-        tanggal_closed: rawItem['Tanggal Closed'] || '-',
+        // Data Lain
+        tanggal_hazard: rawItem['tanggal_hazard'] || rawItem['Tanggal Hazard'] || rawItem['Tanggal'] || null,
+        unit: rawItem['unit'] || rawItem['Unit'] || 'Unknown',
+        uraian: rawItem['uraian'] || rawItem['Uraian'] || rawItem['Uraian Hazard'] || '-',
+        status: rawItem['status'] || rawItem['Status'] || 'Open',
+        pic: rawItem['pic'] || rawItem['PIC'] || '-',
+        lokasi: rawItem['lokasi'] || rawItem['Lokasi'] || '-',
+        bukti_pelaporan: rawItem['bukti_pelaporan'] || rawItem['Bukti Pelaporan'] || rawItem['Link Bukti'] || null,
         
-        // --- 3. Lokasi & Unit ---
-        unit: rawItem['Unit'] || rawItem['unit'] || 'Unknown',
-        kelompok: rawItem['Kelompok'] || '-',
-        perusahaan: rawItem['Perusahaan'] || '-',
-        wilayah: rawItem['Wilayah'] || '-',
-        lokasi: rawItem['Lokasi'] || rawItem['lokasi'] || '-',
-        
-        // --- 4. Detail Masalah ---
-        uraian: rawItem['Uraian'] || rawItem['Uraian Hazard'] || rawItem['uraian'] || '-',
-        status: rawItem['Status'] || rawItem['status'] || 'Open',
-        pic: rawItem['PIC'] || rawItem['pic'] || '-',
-        tembusan: rawItem['Tembusan'] || '-',
-        
-        // --- 5. Risiko & Analisis ---
-        kategori_resiko: rawItem['Kategori Resiko'] || '-',
-        risiko: rawItem['Risiko'] || '-',
-        kemungkinan: rawItem['Kemungkinan'] ? String(rawItem['Kemungkinan']) : '-',
-        akibat: rawItem['Akibat'] ? String(rawItem['Akibat']) : '-',
-        response_time: rawItem['Response Time'] ? String(rawItem['Response Time']) : '-',
-        
-        // --- 6. Bukti ---
-        bukti_pelaporan: rawItem['Bukti Pelaporan'] || rawItem['Link Bukti'] || rawItem['bukti_pelaporan'] || null,
-        bukti_tindaklanjut: rawItem['Bukti Tindaklanjut'] || null,
-        
-        // --- 7. Periode ---
-        bulan: rawItem['Bulan'] || '-',
-        tahun: rawItem['Tahun'] ? String(rawItem['Tahun']) : '-'
+        // Tambahan (Optional)
+        kategori_resiko: rawItem['kategori_resiko'] || rawItem['Kategori Resiko'] || '-',
+        tanggal_input_hazard: rawItem['tanggal_input_hazard'] || rawItem['Tanggal Input Hazard'] || '-',
     };
   };
 
@@ -111,9 +91,9 @@ export default function Dashboard() {
         if (data && data.length > 0) { allData = [...allData, ...data]; from += 1000; to += 1000; } else { hasMore = false; }
       }
       
-      // Karena data dari DB sudah ternormalisasi (kolom snake_case), kita pakai langsung
-      // Tapi untuk amannya, kita normalize lagi agar key object konsisten
-      const cleanData = allData.map(normalizeData); 
+      // Normalisasi data dari DB (biar aman dan key object konsisten)
+      const cleanData = allData.map(normalizeData);
+      
       setHazardData(cleanData);
       calculateSummary(cleanData);
     } catch (error) { console.error("Error dashboard:", error.message); }
@@ -157,9 +137,9 @@ export default function Dashboard() {
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
   };
 
+  // --- HANDLER UPLOAD EXCEL (BATCHING / NYICIL) ---
   const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
-  // --- HANDLER UPLOAD EXCEL (VERSI BATCHING / NYICIL) ---
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
@@ -179,7 +159,7 @@ export default function Dashboard() {
                 return;
             }
 
-            // 1. Normalisasi Data
+            // 1. Normalisasi Data SEBELUM kirim ke DB
             const formattedData = jsonData.map(normalizeData);
             const totalRows = formattedData.length;
             const batchSize = 500; // Kirim per 500 baris agar tidak time-out
@@ -194,10 +174,10 @@ export default function Dashboard() {
 
                 if (error) {
                     console.error("Batch Error:", error);
-                    throw error; // Berhenti jika ada error
+                    throw error; 
                 }
 
-                // Update Progress
+                // Update Progress Bar
                 const progress = Math.round(((i + batch.length) / totalRows) * 100);
                 setUploadProgress(progress);
             }
@@ -222,7 +202,7 @@ export default function Dashboard() {
     }
   };
 
-  // --- HANDLER LAINNYA ---
+  // --- HANDLER KLIK UNIT (Filter & Sort) ---
   const handleUnitClick = (unitName) => {
     refreshDetailModal(unitName, hazardData);
     setIsDetailModalOpen(true);
@@ -230,20 +210,33 @@ export default function Dashboard() {
 
   const refreshDetailModal = (unitName, currentData) => {
     const unitRows = currentData.filter(item => item.unit?.trim() === unitName);
+    
+    // Filter status: HANYA Open & In Progress
     const filteredRows = unitRows.filter(row => {
         return row.status === 'Open' || row.status === 'Work In Progress';
     });
-    filteredRows.sort((a, b) => new Date(b.tanggal_hazard) - new Date(a.tanggal_hazard));
+
+    // Sort tanggal terbaru
+    filteredRows.sort((a, b) => {
+        const dateA = new Date(a.tanggal_hazard);
+        const dateB = new Date(b.tanggal_hazard);
+        if (!isNaN(dateA) && !isNaN(dateB)) return dateB - dateA;
+        return 0;
+    });
+    
     setSelectedUnitName(unitName);
     setSelectedUnitRows(filteredRows);
   };
 
+  // --- HANDLER EDIT DATA ---
   const handleRowClick = (hazardItem) => {
     setSelectedHazardToEdit(hazardItem);
     setIsEditModalOpen(true);
   };
 
+  // --- LOGIKA SIMPAN STATUS (FIXED: ID MATCHING) ---
   const handleSaveStatus = async (itemToEdit, newStatus) => {
+    // 1. Ambil ID Unik
     const targetId = itemToEdit.no_pelaporan; 
 
     if (!targetId) {
@@ -252,6 +245,7 @@ export default function Dashboard() {
     }
 
     try {
+        // 2. Update Database Supabase
         const { error } = await supabase
             .from('hazards')
             .update({ status: newStatus })
@@ -259,17 +253,20 @@ export default function Dashboard() {
 
         if (error) throw error;
 
+        // 3. Update State Lokal (Hanya update 1 baris yang ID-nya cocok)
         const updatedData = hazardData.map(row => {
             if (row.no_pelaporan === targetId) {
-                return { ...row, status: newStatus }; 
+                return { ...row, status: newStatus }; // Update status baris ini
             }
-            return row; 
+            return row; // Baris lain tetap sama
         });
 
         setHazardData(updatedData);
         calculateSummary(updatedData);
-        refreshDetailModal(selectedUnitName, updatedData); 
+        refreshDetailModal(selectedUnitName, updatedData); // Refresh tabel popup
+
         alert("Status berhasil diperbarui!");
+
     } catch (error) {
         alert("Gagal update status: " + error.message);
     }
