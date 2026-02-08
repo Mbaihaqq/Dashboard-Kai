@@ -58,32 +58,34 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data, onRowCli
                             data.map((row, idx) => (
                                 <tr 
                                     key={idx} 
-                                    onClick={() => onRowClick && onRowClick(row)} // Pastikan fungsi dipanggil
+                                    onClick={() => onRowClick && onRowClick(row)} 
                                     className="hover:bg-blue-50 transition-colors group cursor-pointer border-l-4 border-transparent hover:border-[#005DAA]"
                                 >
                                     <td className="px-6 py-4 text-center font-medium text-gray-500">{idx + 1}</td>
                                     
+                                    {/* FIX: Menggunakan kunci 'no_pelaporan' (snake_case) */}
                                     <td className="px-6 py-4 font-bold text-gray-700 whitespace-nowrap">
-                                        {row['no. pelaporan'] || row['No. Pelaporan'] || '-'}
+                                        {row.no_pelaporan || '-'}
                                     </td>
                                     
+                                    {/* FIX: Menggunakan kunci 'tanggal_hazard' */}
                                     <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
                                         <div className="flex items-center gap-2">
                                             <Calendar size={14} className="text-gray-400"/>
-                                            {row['tanggal hazard'] || row['Tanggal Hazard'] || '-'}
+                                            {row.tanggal_hazard || '-'}
                                         </div>
                                     </td>
                                     
+                                    {/* FIX: Menggunakan kunci 'uraian' */}
                                     <td className="px-6 py-4 text-gray-600 leading-relaxed">
-                                        <div className="line-clamp-2" title={row['uraian'] || row['Uraian']}>
-                                            {row['uraian'] || row['Uraian'] || '-'}
+                                        <div className="line-clamp-2" title={row.uraian}>
+                                            {row.uraian || '-'}
                                         </div>
                                     </td>
                                     
-                                    {/* STATUS (DIPERBAIKI AGAR TIDAK TURUN BARIS) */}
                                     <td className="px-6 py-4 text-center whitespace-nowrap">
-                                        <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase border shadow-sm w-full min-w-[120px] ${getStatusBadge(row.status || row['Status'])}`}>
-                                            {row.status || row['Status'] || 'Unknown'}
+                                        <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase border shadow-sm w-full min-w-[120px] ${getStatusBadge(row.status)}`}>
+                                            {row.status || 'Unknown'}
                                             <Edit3 size={10} className="opacity-40" />
                                         </span>
                                     </td>
@@ -91,17 +93,17 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data, onRowCli
                                     <td className="px-6 py-4 text-gray-600">
                                         <div className="flex items-center gap-2">
                                             <User size={14} className="text-gray-400 shrink-0"/>
-                                            <span className="truncate max-w-[150px]" title={row.pic || row['PIC']}>
-                                                {row.pic || row['PIC'] || '-'}
+                                            <span className="truncate max-w-[150px]" title={row.pic}>
+                                                {row.pic || '-'}
                                             </span>
                                         </div>
                                     </td>
                                     
-                                    {/* BUKTI (STOP PROPAGATION AGAR TOMBOL LIHAT BISA DIKLIK TANPA MEMBUKA EDIT) */}
+                                    {/* FIX: Menggunakan kunci 'bukti_pelaporan' */}
                                     <td className="px-6 py-4 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                        {(row['bukti pelaporan'] || row['Bukti Pelaporan']) ? (
+                                        {row.bukti_pelaporan ? (
                                             <a 
-                                                href={row['bukti pelaporan'] || row['Bukti Pelaporan']} 
+                                                href={row.bukti_pelaporan} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-[#005DAA] hover:text-white hover:border-[#005DAA] transition-all text-xs font-bold"
@@ -126,7 +128,6 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data, onRowCli
             </div>
         </div>
         
-        {/* Footer */}
         <div className="px-8 py-4 bg-gray-50 border-t border-gray-200 text-right">
             <button 
                 onClick={onClose}
