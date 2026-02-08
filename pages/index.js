@@ -11,11 +11,11 @@ export default function Dashboard() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [unitsData, setUnitsData] = useState([]);
   
-  // --- STATE MODAL & LAST UPDATE ---
+  // --- STATE MODAL & TANGGAL ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState('-'); // Default strip dulu
+  const [lastUpdate, setLastUpdate] = useState(''); // State tanggal
 
   const [summary, setSummary] = useState({ 
     open: 0, pctOpen: 0,
@@ -24,7 +24,7 @@ export default function Dashboard() {
     total: 0
   });
 
-  // SKEMA WARNA
+  // SKEMA WARNA (Tetap)
   const COLORS = {
     new: '#ef4444',      // Merah
     open: '#f59e0b',     // Kuning/Orange
@@ -33,16 +33,12 @@ export default function Dashboard() {
     empty: '#e5e7eb'     // Abu-abu background chart
   };
 
-  // FUNGSI FORMAT TANGGAL (Contoh: 19/02/2026 - 15:30)
+  // Helper: Format Tanggal Indonesia
   const formatDateTime = (date) => {
     return new Date(date).toLocaleString('id-ID', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    }).replace(/\./g, ':'); // Ganti pemisah waktu jadi titik dua jika perlu
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    }).replace(/\./g, ':');
   };
 
   useEffect(() => {
@@ -51,17 +47,21 @@ export default function Dashboard() {
       router.push('/loginPage/login');
     } else {
       setIsAuthorized(true);
+      fetchHazardStatistics();
+
+      // --- LOGIKA TANGGAL (FIXED) ---
+      // 1. Cek apakah sudah ada tanggal di LocalStorage?
+      const savedDate = localStorage.getItem('last_update_fixed');
       
-      // 1. Cek apakah ada tanggal tersimpan di LocalStorage (History upload terakhir)
-      const savedDate = localStorage.getItem('last_hazard_update');
       if (savedDate) {
+        // 2. Jika ada, pakai itu (JANGAN BUAT BARU)
         setLastUpdate(savedDate);
       } else {
-        // Jika belum ada history, pakai tanggal hari ini
-        setLastUpdate(formatDateTime(new Date()));
+        // 3. Jika kosong (pertama kali buka), buat baru SEKALI SAJA dan simpan
+        const initialDate = formatDateTime(new Date());
+        setLastUpdate(initialDate);
+        localStorage.setItem('last_update_fixed', initialDate);
       }
-
-      fetchHazardStatistics();
     }
   }, [router]);
 
@@ -135,7 +135,7 @@ export default function Dashboard() {
     }
   };
 
-  // --- HANDLER FILE ---
+  // --- HANDLER MODAL & UPLOAD ---
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
@@ -146,26 +146,18 @@ export default function Dashboard() {
     if (!selectedFile) return;
     setIsUploading(true);
     
-    // SIMULASI PROSES UPLOAD
+    // SIMULASI UPLOAD
     setTimeout(() => {
         setIsUploading(false);
         
-        // --- LOGIKA UPDATE TANGGAL DISINI ---
-        const now = new Date();
-        const newTimeString = formatDateTime(now);
-        
-        // 1. Update Tampilan Layar
-        setLastUpdate(newTimeString);
-        
-        // 2. Simpan ke Browser agar tidak hilang saat refresh
-        localStorage.setItem('last_hazard_update', newTimeString);
+        // --- UPDATE TANGGAL HANYA DISINI ---
+        const now = formatDateTime(new Date());
+        setLastUpdate(now); // Update tampilan
+        localStorage.setItem('last_update_fixed', now); // Simpan ke storage
 
-        alert(`File ${selectedFile.name} berhasil diupload! Data diperbarui.`);
-        
-        setIsModalOpen(false); // Tutup modal
-        setSelectedFile(null); // Reset file input
-        
-        // fetchHazardStatistics(); // Uncomment ini jika backend upload sudah siap untuk refresh data grafik
+        alert(`File ${selectedFile.name} berhasil diupload!`);
+        setIsModalOpen(false);
+        setSelectedFile(null);
     }, 1500);
   };
 
@@ -173,42 +165,47 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="w-full">
+      <div className="w-full px-6 py-4">
         
-        {/* --- HEADER --- */}
+        {/* --- HEADER PAGE --- */}
         <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-black">Dashboard</h1>
+            
+            {/* BUTTON IMPORT (Membuka Modal) */}
             <button 
                 onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-5 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
+                className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
             >
-                <UploadCloud size={18} />
+                <UploadCloud size={16} />
                 Import File
             </button>
         </div>
 
-        {/* --- KOTAK HAZARD REPORT (HALF WIDTH FULL KIRI) --- */}
-        <div className="w-full max-w-[1100px] bg-white rounded-[1.5rem] p-8 shadow-sm mb-12 border border-gray-100">
-            <div className="flex justify-between items-start mb-8 pb-4">
+        {/* --- KOTAK PUTIH UTAMA (RINGKASAN) --- */}
+        {/* Dikembalikan ke style Design A: max-w-[1050px], mr-auto */}
+        <div className="w-full max-w-[1050px] mr-auto bg-white rounded-[1.5rem] p-8 shadow-sm mb-12 border border-gray-100">
+            
+            {/* Header Dalam Kotak */}
+            <div className="flex justify-between items-start mb-8 border-b border-gray-50 pb-4">
                 <div>
                     <h2 className="text-xl font-bold text-[#005DAA] mb-2">Hazard Report</h2>
                     <span className="border border-gray-300 text-gray-500 text-xs px-3 py-1 rounded-full font-medium">
                         KAI DAOP 4
                     </span>
-                    {/* BAGIAN TANGGAL UPDATE */}
-                    <div className="mt-3">
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Last Updated :</p>
-                        <p className="text-sm font-bold text-gray-700">{lastUpdate}</p>
-                    </div>
+                    <p className="text-[10px] text-gray-400 mt-2 font-medium">
+                        Last Updated : <br/> {lastUpdate}
+                    </p>
                 </div>
+                
                 <div className="text-right">
-                    <span className="text-7xl font-black text-[#1F2937] tracking-tighter">
+                    <span className="text-6xl font-black text-gray-800 tracking-tight">
                         {summary.total}
                     </span>
-                    <p className="text-sm text-gray-500 font-medium mt-1 uppercase tracking-wider">Total Hazard</p>
+                    <p className="text-sm text-gray-500 font-medium mt-1">Total Hazard</p>
                 </div>
             </div>
 
+            {/* Grafik Ringkasan */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 <BigGauge label="New Hazard" pct={summary.pctOpen} color={COLORS.new} />
                 <BigGauge label="Open Hazard" pct={summary.pctOpen} color={COLORS.open} />
@@ -217,16 +214,16 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* --- UNIT ANALYTICS --- */}
+        {/* --- UNIT ANALYTICS (GRID BAWAH) --- */}
         <div className="w-full">
-            <h3 className="text-xl font-bold text-gray-800 mb-6 border-l-4 border-[#005DAA] pl-3">
+            <h3 className="text-xl font-bold text-gray-700 mb-6 border-l-4 border-[#005DAA] pl-3">
                 Detail Unit ({unitsData.length})
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-12">
                 {unitsData.map((unit, idx) => (
                 <div key={idx} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300">
-                    <h4 className="text-sm font-bold text-gray-700 mb-4 h-6 truncate uppercase tracking-tight">
+                    <h4 className="text-base font-bold text-gray-700 mb-4 h-6 truncate uppercase">
                         {unit.name}
                     </h4>
                     <div className="relative w-full h-40 flex justify-center items-end overflow-hidden mb-6">
@@ -252,34 +249,48 @@ export default function Dashboard() {
                         <span className="text-xs text-gray-400 font-bold mt-1">TL%</span>
                     </div>
                     </div>
-                    <div className="flex justify-between items-end px-1 gap-2">
+                    {/* Legend Unit - Style Lama */}
+                    <div className="flex justify-between items-end px-2 gap-2">
                         <div className="flex gap-2 items-center">
                             <div className="w-1.5 h-8 bg-[#f59e0b] rounded-full"></div>
-                            <div><span className="text-[10px] text-gray-400 block uppercase font-bold">Open</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[0].value}</span></div>
+                            <div>
+                                <span className="text-[10px] text-gray-400 block uppercase font-bold">Open</span>
+                                <span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[0].value}</span>
+                            </div>
                         </div>
                         <div className="flex gap-2 items-center">
                             <div className="w-1.5 h-8 bg-[#10b981] rounded-full"></div>
-                            <div><span className="text-[10px] text-gray-400 block uppercase font-bold">Prog</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[1].value}</span></div>
+                            <div>
+                                <span className="text-[10px] text-gray-400 block uppercase font-bold">Prog</span>
+                                <span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[1].value}</span>
+                            </div>
                         </div>
                         <div className="flex gap-2 items-center">
                             <div className="w-1.5 h-8 bg-[#8b5cf6] rounded-full"></div>
-                            <div><span className="text-[10px] text-gray-400 block uppercase font-bold">Close</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[2].value}</span></div>
+                            <div>
+                                <span className="text-[10px] text-gray-400 block uppercase font-bold">Close</span>
+                                <span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[2].value}</span>
+                            </div>
                         </div>
                         <div className="flex gap-2 items-center border-l pl-4 border-gray-100">
                             <div className="w-1.5 h-8 bg-gray-400 rounded-full"></div>
-                            <div><span className="text-[10px] text-gray-400 block uppercase font-bold">Total</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.total}</span></div>
+                            <div>
+                                <span className="text-[10px] text-gray-400 block uppercase font-bold">Total</span>
+                                <span className="text-lg font-bold text-gray-800 leading-none">{unit.total}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
                 ))}
             </div>
         </div>
+
       </div>
 
-      {/* --- POP-UP MODAL IMPORT --- */}
+      {/* --- POP-UP MODAL IMPORT (FIXED) --- */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300">
-            <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl transform scale-100 transition-all">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
+            <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xl font-bold text-gray-800">Import Data</h3>
                     <button 
@@ -296,35 +307,35 @@ export default function Dashboard() {
                         onChange={handleFileChange}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     />
-                    <div className={`border-2 border-dashed rounded-xl h-48 flex flex-col items-center justify-center transition-all duration-300 ${selectedFile ? 'border-[#005DAA] bg-blue-50' : 'border-gray-300 bg-gray-50 group-hover:bg-gray-100'}`}>
+                    <div className={`border-2 border-dashed rounded-2xl h-52 flex flex-col items-center justify-center transition-all duration-300 ${selectedFile ? 'border-[#005DAA] bg-blue-50/50' : 'border-gray-300 bg-gray-50 group-hover:bg-gray-100'}`}>
                         {selectedFile ? (
                             <>
-                                <FileSpreadsheet size={48} className="text-[#005DAA] mb-3 animate-bounce" />
-                                <p className="text-sm font-bold text-[#005DAA] truncate max-w-[80%]">{selectedFile.name}</p>
+                                <FileSpreadsheet size={48} className="text-[#005DAA] mb-3" />
+                                <p className="text-sm font-bold text-[#005DAA] truncate max-w-[80%] text-center px-4">{selectedFile.name}</p>
                                 <p className="text-xs text-gray-500 mt-1">{(selectedFile.size / 1024).toFixed(2)} KB</p>
                             </>
                         ) : (
                             <>
-                                <div className="bg-white p-3 rounded-full shadow-sm mb-3">
+                                <div className="bg-white p-4 rounded-full shadow-sm mb-4">
                                     <UploadCloud size={32} className="text-[#005DAA]" />
                                 </div>
-                                <p className="text-sm font-bold text-gray-600">Pilih File Excel Anda</p>
+                                <p className="text-sm font-bold text-gray-700">Pilih File Excel Anda</p>
                                 <p className="text-xs text-gray-400 mt-1">Support: .xlsx, .csv</p>
                             </>
                         )}
                     </div>
                 </div>
-                <div className="flex gap-3 mt-6">
+                <div className="flex gap-3">
                     <button 
                         onClick={() => setIsModalOpen(false)}
-                        className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                        className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors text-sm"
                     >
                         Batal
                     </button>
                     <button 
                         onClick={handleUpload}
                         disabled={!selectedFile || isUploading}
-                        className={`flex-1 py-3 rounded-xl font-bold text-white transition-all flex justify-center items-center gap-2 ${!selectedFile ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#005DAA] hover:bg-blue-800 shadow-lg hover:shadow-xl'}`}
+                        className={`flex-1 py-3 rounded-xl font-bold text-white text-sm transition-all flex justify-center items-center gap-2 ${!selectedFile ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#005DAA] hover:bg-blue-800 shadow-lg hover:shadow-xl'}`}
                     >
                         {isUploading ? 'Mengupload...' : 'Upload File'}
                     </button>
@@ -337,7 +348,7 @@ export default function Dashboard() {
   );
 }
 
-// KOMPONEN GAUGE BESAR
+// KOMPONEN GAUGE BESAR (Design A Style)
 function BigGauge({ label, pct, color }) {
     const data = [
         { value: pct, color: color },
