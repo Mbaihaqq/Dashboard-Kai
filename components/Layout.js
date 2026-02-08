@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { Search, Menu, X } from 'lucide-react';
+import { Search, Menu, X, ChevronDown, LayoutDashboard, BarChart3 } from 'lucide-react'; // Tambah icon baru
 import { supabase } from '../lib/supabaseClient';
 
 export default function Layout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [role, setRole] = useState('user');
+  
+  // State untuk Dropdown User
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState('Dashboard');
+
   const router = useRouter();
 
   useEffect(() => {
@@ -19,6 +24,13 @@ export default function Layout({ children }) {
     router.push('/loginPage/login');
   };
 
+  // Fungsi ganti halaman untuk User
+  const handlePageChange = (pageName, path) => {
+    setCurrentPage(pageName);
+    setIsDropdownOpen(false);
+    router.push(path);
+  };
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-sans flex flex-col">
       
@@ -26,14 +38,14 @@ export default function Layout({ children }) {
       <nav className="bg-white px-8 py-3 shadow-sm sticky top-0 z-50 border-b border-gray-100">
         <div className="flex justify-between items-center w-full">
           
-          {/* KIRI: Logo Area */}
+          {/* 1. KIRI: Logo Area */}
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => router.push('/')}>
             <img src="/logo-kai.png" alt="Logo KAI" className="h-10 w-auto object-contain" />
             <img src="/logo-daop4.png" alt="Logo Daop 4" className="h-12 w-auto object-contain" />
           </div>
 
-          {/* TENGAH: Search Bar (Style Abu-abu Rounded) */}
-          <div className="hidden md:flex flex-1 max-w-3xl mx-12 relative">
+          {/* 2. TENGAH: Search Bar */}
+          <div className="hidden md:flex flex-1 max-w-2xl mx-8 relative">
              <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#F26522]">
                 <Search size={20} />
              </div>
@@ -44,7 +56,45 @@ export default function Layout({ children }) {
              />
           </div>
 
-          {/* KANAN: Tombol Profil */}
+          {/* 3. TENGAH-KANAN: DROPDOWN MENU (KHUSUS USER) */}
+          {role === 'user' && (
+            <div className="hidden md:block relative mr-6">
+                <button 
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="flex items-center gap-3 bg-white border border-gray-200 hover:border-gray-400 text-gray-700 px-5 py-2.5 rounded-lg shadow-sm transition-all text-sm font-bold min-w-[180px] justify-between"
+                >
+                    <div className="flex items-center gap-2">
+                        <LayoutDashboard size={18} className="text-[#005DAA]"/>
+                        <span>{currentPage}</span>
+                    </div>
+                    <ChevronDown size={16} className={`text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Isi Dropdown */}
+                {isDropdownOpen && (
+                    <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                        <div className="py-1">
+                            <button 
+                                onClick={() => handlePageChange('Dashboard', '/')}
+                                className="w-full text-left px-4 py-3 text-sm text-gray-600 hover:bg-blue-50 hover:text-[#005DAA] flex items-center gap-3 border-b border-gray-50"
+                            >
+                                <LayoutDashboard size={16} />
+                                Dashboard
+                            </button>
+                            <button 
+                                onClick={() => handlePageChange('TL% Analytics', '/tl-analytics')} // Ganti path sesuai kebutuhan
+                                className="w-full text-left px-4 py-3 text-sm text-gray-600 hover:bg-blue-50 hover:text-[#005DAA] flex items-center gap-3"
+                            >
+                                <BarChart3 size={16} />
+                                TL% Analytics
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+          )}
+
+          {/* 4. KANAN: Tombol Profil */}
           <div className="flex items-center gap-4">
              <div className="hidden md:block">
                 <Link href="/profile">
@@ -63,44 +113,34 @@ export default function Layout({ children }) {
         </div>
       </nav>
 
-      {/* --- BARIS 2: NAVIGATION BAR (ORANYE) --- */}
-      <div className="bg-[#E85D18] shadow-md relative z-40 hidden md:block">
-         <div className="w-full px-8 flex items-center gap-1 h-12">
-            
-            {/* Menu 1: Dashboard (Background Gelap saat Aktif) */}
-            <Link href="/">
-               <div className={`px-6 py-1.5 rounded text-sm font-bold cursor-pointer transition-all ${router.pathname === '/' ? 'bg-[#1F2937] text-white shadow-lg' : 'text-white hover:bg-white/10'}`}>
-                  Dashboard
-               </div>
-            </Link>
-
-            {/* Menu 2: TL % Analitics */}
-            <Link href="#"> 
-               <div className="px-6 py-1.5 text-white font-semibold text-sm hover:bg-white/10 rounded transition-all cursor-pointer">
-                  TL % Analitics
-               </div>
-            </Link>
-
-            {/* Menu 3: Histori Penginputan Data (Admin: Import) */}
-            {role === 'admin' && (
+      {/* --- BARIS 2: NAVIGATION BAR (KHUSUS ADMIN) --- */}
+      {/* Baris ini HILANG jika role == 'user' */}
+      {role === 'admin' && (
+        <div className="bg-[#E85D18] shadow-md relative z-40 hidden md:block">
+            <div className="w-full px-8 flex items-center gap-1 h-12">
+                <Link href="/">
+                    <div className={`px-6 py-1.5 rounded text-sm font-bold cursor-pointer transition-all ${router.pathname === '/' ? 'bg-[#1F2937] text-white shadow-lg' : 'text-white hover:bg-white/10'}`}>
+                        Dashboard
+                    </div>
+                </Link>
+                <Link href="#"> 
+                    <div className="px-6 py-1.5 text-white font-semibold text-sm hover:bg-white/10 rounded transition-all cursor-pointer">
+                        TL % Analitics
+                    </div>
+                </Link>
                 <Link href="/admin/import">
-                   <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer ${router.pathname === '/admin/import' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
-                      Histori Penginputan Data
-                   </div>
+                    <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer ${router.pathname === '/admin/import' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
+                        Histori Penginputan Data
+                    </div>
                 </Link>
-            )}
-
-            {/* Menu 4: Permohonan Akun (Admin: Approval) */}
-            {role === 'admin' && (
                 <Link href="/admin/approval">
-                   <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer ${router.pathname === '/admin/approval' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
-                      Permohonan Akun
-                   </div>
+                    <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer ${router.pathname === '/admin/approval' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
+                        Permohonan Akun
+                    </div>
                 </Link>
-            )}
-
-         </div>
-      </div>
+            </div>
+        </div>
+      )}
 
       {/* --- MAIN CONTENT (FULL WIDTH) --- */}
       <main className="w-full px-8 py-8 flex-grow">
