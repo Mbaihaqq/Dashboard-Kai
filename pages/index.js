@@ -6,8 +6,8 @@ import DetailGrafik from '../components/DetailGrafik';
 import DetailHazard from '../components/DetailHazard'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
-import { UploadCloud, X, FileSpreadsheet, ChevronDown, LayoutDashboard, BarChart3, Loader2 } from 'lucide-react';
-import * as XLSX from 'xlsx'; // Pastikan sudah install: npm install xlsx
+import { UploadCloud, X, FileSpreadsheet, ChevronDown, LayoutDashboard, BarChart3, Loader2, History } from 'lucide-react';
+import * as XLSX from 'xlsx'; 
 
 export default function Dashboard() {
   const router = useRouter();
@@ -60,13 +60,10 @@ export default function Dashboard() {
     }
   }, [router]);
 
-  // --- 1. NORMALISASI DATA (Agar ID & Kolom selalu terbaca) ---
+  // --- 1. NORMALISASI DATA ---
   const normalizeData = (rawItem) => {
     return {
-        // ID Unik (Cek berbagai kemungkinan header Excel)
         no_pelaporan: rawItem['no_pelaporan'] || rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['report_no'] || `UNKNOWN-${Math.random()}`,
-        
-        // Data Lain
         tanggal_hazard: rawItem['tanggal_hazard'] || rawItem['Tanggal Hazard'] || rawItem['Tanggal'] || null,
         unit: rawItem['unit'] || rawItem['Unit'] || 'Unknown',
         uraian: rawItem['uraian'] || rawItem['Uraian'] || rawItem['Uraian Hazard'] || '-',
@@ -74,8 +71,6 @@ export default function Dashboard() {
         pic: rawItem['pic'] || rawItem['PIC'] || '-',
         lokasi: rawItem['lokasi'] || rawItem['Lokasi'] || '-',
         bukti_pelaporan: rawItem['bukti_pelaporan'] || rawItem['Bukti Pelaporan'] || rawItem['Link Bukti'] || null,
-        
-        // Tambahan (Optional)
         kategori_resiko: rawItem['kategori_resiko'] || rawItem['Kategori Resiko'] || '-',
         tanggal_input_hazard: rawItem['tanggal_input_hazard'] || rawItem['Tanggal Input Hazard'] || '-',
     };
@@ -91,9 +86,7 @@ export default function Dashboard() {
         if (data && data.length > 0) { allData = [...allData, ...data]; from += 1000; to += 1000; } else { hasMore = false; }
       }
       
-      // Normalisasi data dari DB (biar aman dan key object konsisten)
       const cleanData = allData.map(normalizeData);
-      
       setHazardData(cleanData);
       calculateSummary(cleanData);
     } catch (error) { console.error("Error dashboard:", error.message); }
@@ -137,9 +130,9 @@ export default function Dashboard() {
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
   };
 
-  // --- HANDLER UPLOAD EXCEL (BATCHING / NYICIL) ---
   const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
+  // --- HANDLER UPLOAD & CATAT HISTORY ---
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
@@ -159,30 +152,27 @@ export default function Dashboard() {
                 return;
             }
 
-            // 1. Normalisasi Data SEBELUM kirim ke DB
             const formattedData = jsonData.map(normalizeData);
             const totalRows = formattedData.length;
-            const batchSize = 500; // Kirim per 500 baris agar tidak time-out
+            const batchSize = 500; 
 
-            // 2. Kirim ke Supabase dengan Batching
+            // 1. Upload Data (Batching)
             for (let i = 0; i < totalRows; i += batchSize) {
                 const batch = formattedData.slice(i, i + batchSize);
-                
-                const { error } = await supabase
-                    .from('hazards')
-                    .upsert(batch, { onConflict: 'no_pelaporan' });
-
-                if (error) {
-                    console.error("Batch Error:", error);
-                    throw error; 
-                }
-
-                // Update Progress Bar
-                const progress = Math.round(((i + batch.length) / totalRows) * 100);
-                setUploadProgress(progress);
+                const { error } = await supabase.from('hazards').upsert(batch, { onConflict: 'no_pelaporan' });
+                if (error) throw error;
+                setUploadProgress(Math.round(((i + batch.length) / totalRows) * 100));
             }
 
-            // 3. Sukses
+            // 2. CATAT KE DB HISTORY (PENTING: Biar muncul di halaman History)
+            const { error: historyError } = await supabase.from('upload_history').insert({
+                admin_name: userRole || 'Admin',
+                file_name: selectedFile.name,
+                total_rows: totalRows
+            });
+            if (historyError) console.error("Gagal catat history:", historyError);
+
+            // 3. Selesai
             const now = formatDateTime(new Date());
             setLastUpdate(now); 
             localStorage.setItem('last_update_fixed', now); 
@@ -202,7 +192,6 @@ export default function Dashboard() {
     }
   };
 
-  // --- HANDLER KLIK UNIT (Filter & Sort) ---
   const handleUnitClick = (unitName) => {
     refreshDetailModal(unitName, hazardData);
     setIsDetailModalOpen(true);
@@ -210,66 +199,42 @@ export default function Dashboard() {
 
   const refreshDetailModal = (unitName, currentData) => {
     const unitRows = currentData.filter(item => item.unit?.trim() === unitName);
-    
-    // Filter status: HANYA Open & In Progress
     const filteredRows = unitRows.filter(row => {
         return row.status === 'Open' || row.status === 'Work In Progress';
     });
-
-    // Sort tanggal terbaru
     filteredRows.sort((a, b) => {
         const dateA = new Date(a.tanggal_hazard);
         const dateB = new Date(b.tanggal_hazard);
         if (!isNaN(dateA) && !isNaN(dateB)) return dateB - dateA;
         return 0;
     });
-    
     setSelectedUnitName(unitName);
     setSelectedUnitRows(filteredRows);
   };
 
-  // --- HANDLER EDIT DATA ---
   const handleRowClick = (hazardItem) => {
     setSelectedHazardToEdit(hazardItem);
     setIsEditModalOpen(true);
   };
 
-  // --- LOGIKA SIMPAN STATUS (FIXED: ID MATCHING) ---
   const handleSaveStatus = async (itemToEdit, newStatus) => {
-    // 1. Ambil ID Unik
     const targetId = itemToEdit.no_pelaporan; 
-
-    if (!targetId) {
-        alert("Gagal: Data tidak memiliki No. Pelaporan.");
-        return;
-    }
+    if (!targetId) { alert("Gagal: No. Pelaporan tidak ditemukan."); return; }
 
     try {
-        // 2. Update Database Supabase
-        const { error } = await supabase
-            .from('hazards')
-            .update({ status: newStatus })
-            .eq('no_pelaporan', targetId);
-
+        const { error } = await supabase.from('hazards').update({ status: newStatus }).eq('no_pelaporan', targetId);
         if (error) throw error;
 
-        // 3. Update State Lokal (Hanya update 1 baris yang ID-nya cocok)
         const updatedData = hazardData.map(row => {
-            if (row.no_pelaporan === targetId) {
-                return { ...row, status: newStatus }; // Update status baris ini
-            }
-            return row; // Baris lain tetap sama
+            if (row.no_pelaporan === targetId) return { ...row, status: newStatus }; 
+            return row; 
         });
 
         setHazardData(updatedData);
         calculateSummary(updatedData);
-        refreshDetailModal(selectedUnitName, updatedData); // Refresh tabel popup
-
+        refreshDetailModal(selectedUnitName, updatedData); 
         alert("Status berhasil diperbarui!");
-
-    } catch (error) {
-        alert("Gagal update status: " + error.message);
-    }
+    } catch (error) { alert("Gagal update status: " + error.message); }
   };
 
   if (!isAuthorized) return <div className="h-screen bg-[#F8F9FA]"></div>;
@@ -281,10 +246,25 @@ export default function Dashboard() {
         {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-black">Dashboard</h1>
+            
             {userRole === 'admin' && (
-                <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
-                    <UploadCloud size={16} /> Import File
-                </button>
+                <div className="flex gap-3">
+                    {/* TOMBOL HISTORY (Ke Halaman Baru) */}
+                    <button 
+                        onClick={() => router.push('/history')} 
+                        className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
+                    >
+                        <History size={16} /> Riwayat Upload
+                    </button>
+
+                    {/* TOMBOL IMPORT (Buka Modal) */}
+                    <button 
+                        onClick={() => setIsModalOpen(true)} 
+                        className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
+                    >
+                        <UploadCloud size={16} /> Import File
+                    </button>
+                </div>
             )}
         </div>
 
@@ -334,31 +314,21 @@ export default function Dashboard() {
 
       </div>
 
-      {/* --- MODALS --- */}
+      {/* --- MODAL 1: IMPORT FILE --- */}
       {userRole === 'admin' && isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
             <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
                 <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-gray-800">Import Data</h3><button onClick={() => setIsModalOpen(false)} className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"><X size={24} /></button></div>
                 <div className="relative group mb-6"><input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" /><div className={`border-2 border-dashed rounded-2xl h-52 flex flex-col items-center justify-center transition-all duration-300 ${selectedFile ? 'border-[#005DAA] bg-blue-50/50' : 'border-gray-300 bg-gray-50 group-hover:bg-gray-100'}`}>{selectedFile ? (<><FileSpreadsheet size={48} className="text-[#005DAA] mb-3" /><p className="text-sm font-bold text-[#005DAA] truncate max-w-[80%] text-center px-4">{selectedFile.name}</p><p className="text-xs text-gray-500 mt-1">{(selectedFile.size / 1024).toFixed(2)} KB</p></>) : (<><div className="bg-white p-4 rounded-full shadow-sm mb-4"><UploadCloud size={32} className="text-[#005DAA]" /></div><p className="text-sm font-bold text-gray-700">Pilih File Excel Anda</p><p className="text-xs text-gray-400 mt-1">Support: .xlsx, .csv</p></>)}</div></div>
                 
-                {/* PROGRESS BAR */}
-                {isUploading && (
-                    <div className="mb-4">
-                        <div className="flex justify-between text-xs font-bold text-gray-500 mb-1">
-                            <span>Mengupload ke Database...</span>
-                            <span>{uploadProgress}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div className="bg-[#005DAA] h-2.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
-                        </div>
-                    </div>
-                )}
+                {isUploading && (<div className="mb-4"><div className="flex justify-between text-xs font-bold text-gray-500 mb-1"><span>Mengupload ke Database...</span><span>{uploadProgress}%</span></div><div className="w-full bg-gray-200 rounded-full h-2.5"><div className="bg-[#005DAA] h-2.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div></div></div>)}
 
                 <div className="flex gap-3"><button onClick={() => setIsModalOpen(false)} disabled={isUploading} className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors text-sm">Batal</button><button onClick={handleUpload} disabled={!selectedFile || isUploading} className={`flex-1 py-3 rounded-xl font-bold text-white text-sm transition-all flex justify-center items-center gap-2 ${!selectedFile || isUploading ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#005DAA] hover:bg-blue-800 shadow-lg hover:shadow-xl'}`}>{isUploading ? <><Loader2 className="animate-spin" size={16}/> {uploadProgress}%</> : 'Upload File'}</button></div>
             </div>
         </div>
       )}
 
+      {/* --- MODAL 2: DETAIL TABLE --- */}
       <DetailGrafik 
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
@@ -367,6 +337,7 @@ export default function Dashboard() {
         onRowClick={handleRowClick} 
       />
 
+      {/* --- MODAL 3: DETAIL HAZARD --- */}
       <DetailHazard 
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
