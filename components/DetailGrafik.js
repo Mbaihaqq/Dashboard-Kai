@@ -1,10 +1,9 @@
 import React from 'react';
-import { X, Calendar, User, Eye } from 'lucide-react';
+import { X, Calendar, User, Eye, Edit3 } from 'lucide-react';
 
-export default function DetailGrafik({ isOpen, onClose, unitName, data }) {
+export default function DetailGrafik({ isOpen, onClose, unitName, data, onRowClick }) {
   if (!isOpen) return null;
 
-  // Helper warna status badge
   const getStatusBadge = (status) => {
     const s = status?.toLowerCase() || '';
     if (s.includes('close')) return 'bg-purple-100 text-purple-700 border-purple-200';
@@ -25,7 +24,10 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data }) {
                     <span className="bg-blue-50 text-[#005DAA] text-xs px-2.5 py-0.5 rounded-full font-bold border border-blue-100">
                         {data.length} Data Found
                     </span>
-                    <span className="text-gray-400 text-xs">Detail Hazard Report List (Active Only)</span>
+                    <span className="text-gray-400 text-xs flex items-center gap-1">
+                        <Edit3 size={12} />
+                        Klik baris untuk melihat detail & update status
+                    </span>
                 </div>
             </div>
             <button 
@@ -36,51 +38,67 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data }) {
             </button>
         </div>
 
-        {/* Body Table (Scrollable) */}
+        {/* Body Table */}
         <div className="flex-1 overflow-auto p-6 bg-[#F8F9FA]">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <table className="w-full text-sm text-left">
                     <thead className="bg-[#005DAA] text-white uppercase text-xs font-bold tracking-wider">
                         <tr>
-                            <th className="px-6 py-4 w-16 text-center">No</th>
-                            <th className="px-6 py-4">No. Pelaporan</th>
-                            <th className="px-6 py-4">Tanggal Hazard</th>
-                            <th className="px-6 py-4 w-1/3">Uraian Hazard</th>
-                            <th className="px-6 py-4 text-center">Status</th>
-                            <th className="px-6 py-4">PIC</th>
-                            <th className="px-6 py-4 text-center">Bukti</th>
+                            <th className="px-6 py-4 w-12 text-center">No</th>
+                            <th className="px-6 py-4 whitespace-nowrap">No. Pelaporan</th>
+                            <th className="px-6 py-4 whitespace-nowrap">Tanggal</th>
+                            <th className="px-6 py-4 w-1/3 min-w-[300px]">Uraian Hazard</th>
+                            <th className="px-6 py-4 text-center whitespace-nowrap">Status</th>
+                            <th className="px-6 py-4 min-w-[150px]">PIC</th>
+                            <th className="px-6 py-4 text-center whitespace-nowrap">Bukti</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {data.length > 0 ? (
                             data.map((row, idx) => (
-                                <tr key={idx} className="hover:bg-blue-50/30 transition-colors group">
+                                <tr 
+                                    key={idx} 
+                                    onClick={() => onRowClick && onRowClick(row)} // Pastikan fungsi dipanggil
+                                    className="hover:bg-blue-50 transition-colors group cursor-pointer border-l-4 border-transparent hover:border-[#005DAA]"
+                                >
                                     <td className="px-6 py-4 text-center font-medium text-gray-500">{idx + 1}</td>
-                                    {/* Menggunakan fallback OR (||) untuk handle nama kolom besar/kecil dari Excel */}
+                                    
                                     <td className="px-6 py-4 font-bold text-gray-700 whitespace-nowrap">
                                         {row['no. pelaporan'] || row['No. Pelaporan'] || '-'}
                                     </td>
+                                    
                                     <td className="px-6 py-4 text-gray-600 whitespace-nowrap">
                                         <div className="flex items-center gap-2">
                                             <Calendar size={14} className="text-gray-400"/>
                                             {row['tanggal hazard'] || row['Tanggal Hazard'] || '-'}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-gray-600 leading-relaxed min-w-[300px]">
-                                        {row['uraian'] || row['Uraian'] || '-'}
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border ${getStatusBadge(row.status || row['Status'])}`}>
-                                            {row.status || row['Status'] || 'Unknown'}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-gray-600">
-                                        <div className="flex items-center gap-2">
-                                            <User size={14} className="text-gray-400"/>
-                                            <span className="truncate max-w-[150px]" title={row.pic}>{row.pic || row['PIC'] || '-'}</span>
+                                    
+                                    <td className="px-6 py-4 text-gray-600 leading-relaxed">
+                                        <div className="line-clamp-2" title={row['uraian'] || row['Uraian']}>
+                                            {row['uraian'] || row['Uraian'] || '-'}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-center">
+                                    
+                                    {/* STATUS (DIPERBAIKI AGAR TIDAK TURUN BARIS) */}
+                                    <td className="px-6 py-4 text-center whitespace-nowrap">
+                                        <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase border shadow-sm w-full min-w-[120px] ${getStatusBadge(row.status || row['Status'])}`}>
+                                            {row.status || row['Status'] || 'Unknown'}
+                                            <Edit3 size={10} className="opacity-40" />
+                                        </span>
+                                    </td>
+                                    
+                                    <td className="px-6 py-4 text-gray-600">
+                                        <div className="flex items-center gap-2">
+                                            <User size={14} className="text-gray-400 shrink-0"/>
+                                            <span className="truncate max-w-[150px]" title={row.pic || row['PIC']}>
+                                                {row.pic || row['PIC'] || '-'}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    
+                                    {/* BUKTI (STOP PROPAGATION AGAR TOMBOL LIHAT BISA DIKLIK TANPA MEMBUKA EDIT) */}
+                                    <td className="px-6 py-4 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                         {(row['bukti pelaporan'] || row['Bukti Pelaporan']) ? (
                                             <a 
                                                 href={row['bukti pelaporan'] || row['Bukti Pelaporan']} 
@@ -99,7 +117,7 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data }) {
                         ) : (
                             <tr>
                                 <td colSpan="7" className="px-6 py-12 text-center text-gray-400">
-                                    Tidak ada data aktif (Open/In Progress) untuk unit ini.
+                                    Tidak ada data aktif untuk unit ini.
                                 </td>
                             </tr>
                         )}
@@ -108,7 +126,7 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data }) {
             </div>
         </div>
         
-        {/* Footer Modal */}
+        {/* Footer */}
         <div className="px-8 py-4 bg-gray-50 border-t border-gray-200 text-right">
             <button 
                 onClick={onClose}

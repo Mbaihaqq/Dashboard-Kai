@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, AlertCircle, Calendar, User, MapPin } from 'lucide-react';
+import { X, Save, AlertCircle, Calendar, User, MapPin, Eye, FileText } from 'lucide-react';
 
 export default function DetailHazard({ isOpen, onClose, data, onSave }) {
   const [status, setStatus] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Update status local state ketika data baru masuk
   useEffect(() => {
     if (data) {
       setStatus(data.status || data['Status'] || 'Open');
@@ -16,13 +15,15 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
 
   const handleSave = () => {
     setIsSaving(true);
-    // Simulasi proses save
     setTimeout(() => {
-        onSave(data, status); // Kirim data lama dan status baru ke index.js
+        onSave(data, status);
         setIsSaving(false);
         onClose();
     }, 800);
   };
+
+  // Helper untuk cek apakah ada file bukti
+  const buktiUrl = data['bukti pelaporan'] || data['Bukti Pelaporan'];
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 transition-opacity animate-in fade-in duration-200">
@@ -31,7 +32,7 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <AlertCircle size={20} className="text-[#005DAA]" />
+                <FileText size={20} className="text-[#005DAA]" />
                 Detail & Update Status
             </h3>
             <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 transition-colors">
@@ -42,24 +43,24 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
         {/* Content */}
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
             
-            {/* Informasi Utama */}
+            {/* Baris 1: Info Utama */}
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">No. Pelaporan</label>
-                    <div className="mt-1 font-bold text-gray-800 text-sm">
+                    <div className="mt-1 font-bold text-gray-800 text-sm bg-gray-50 p-2 rounded border border-gray-200">
                         {data['no. pelaporan'] || data['No. Pelaporan'] || '-'}
                     </div>
                 </div>
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Tanggal Kejadian</label>
-                    <div className="mt-1 font-bold text-gray-800 text-sm flex items-center gap-2">
+                    <div className="mt-1 font-bold text-gray-800 text-sm bg-gray-50 p-2 rounded border border-gray-200 flex items-center gap-2">
                         <Calendar size={14} className="text-[#005DAA]" />
                         {data['tanggal hazard'] || data['Tanggal Hazard'] || '-'}
                     </div>
                 </div>
             </div>
 
-            {/* Lokasi */}
+            {/* Baris 2: Lokasi */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Lokasi / Unit</label>
                 <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm text-gray-700 border border-gray-200 flex items-start gap-2">
@@ -71,28 +72,46 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
                 </div>
             </div>
 
-            {/* Uraian */}
+            {/* Baris 3: Uraian */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Uraian Hazard</label>
-                <div className="mt-1 p-3 bg-blue-50/50 rounded-lg text-sm text-gray-800 border border-blue-100 leading-relaxed">
+                <div className="mt-1 p-3 bg-blue-50/30 rounded-lg text-sm text-gray-800 border border-blue-100 leading-relaxed">
                     {data['uraian'] || data['Uraian'] || '-'}
                 </div>
             </div>
 
-            {/* PIC */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">PIC / Penanggung Jawab</label>
-                <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                    <User size={16} className="text-[#005DAA]" />
-                    {data.pic || data['PIC'] || '-'}
+            {/* Baris 4: PIC & Bukti (Ditambahkan) */}
+            <div className="grid grid-cols-2 gap-4 items-center">
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">PIC</label>
+                    <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <User size={16} className="text-[#005DAA]" />
+                        <span className="truncate" title={data.pic || data['PIC']}>{data.pic || data['PIC'] || '-'}</span>
+                    </div>
+                </div>
+                
+                <div className="text-right">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Bukti Foto</label>
+                    {buktiUrl ? (
+                        <a 
+                            href={buktiUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded-lg hover:bg-[#005DAA] hover:text-white hover:border-[#005DAA] transition-all text-xs font-bold shadow-sm"
+                        >
+                            <Eye size={14} /> Lihat File Bukti
+                        </a>
+                    ) : (
+                        <span className="text-xs text-gray-400 italic">Tidak ada file</span>
+                    )}
                 </div>
             </div>
 
-            <hr className="border-gray-100" />
+            <hr className="border-gray-200" />
 
-            {/* FORM UBAH STATUS */}
-            <div>
-                <label className="text-sm font-bold text-[#005DAA] uppercase mb-2 block">Update Status</label>
+            {/* FORM UPDATE STATUS */}
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <label className="text-sm font-bold text-[#005DAA] uppercase mb-2 block">Update Status Pengerjaan</label>
                 <div className="relative">
                     <select 
                         value={status} 
@@ -111,11 +130,13 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
                         ▼
                     </div>
                 </div>
+                
+                {/* Pesan Peringatan jika Closed */}
                 {status === 'Closed' && (
-                    <p className="text-[11px] text-purple-600 mt-2 font-medium bg-purple-50 p-2 rounded-lg border border-purple-100 flex items-center gap-1">
-                        <AlertCircle size={12} />
-                        Perhatian: Status "Closed" akan menyembunyikan data ini dari daftar aktif.
-                    </p>
+                    <div className="mt-3 flex items-start gap-2 bg-purple-50 text-purple-700 px-3 py-2 rounded-lg text-xs border border-purple-100 animate-in fade-in slide-in-from-top-1">
+                        <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                        <p><strong>Perhatian:</strong> Mengubah status menjadi <b>Closed</b> berarti hazard ini dianggap selesai dan akan hilang dari daftar aktif (Open/In Progress).</p>
+                    </div>
                 )}
             </div>
         </div>
