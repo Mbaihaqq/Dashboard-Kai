@@ -4,12 +4,18 @@ import Link from 'next/link';
 import Layout from '../components/Layout';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
-import { UploadCloud } from 'lucide-react';
+import { UploadCloud, X, FileSpreadsheet } from 'lucide-react'; // Tambahkan X & FileSpreadsheet
 
 export default function Dashboard() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [unitsData, setUnitsData] = useState([]);
+  
+  // --- STATE MODAL IMPORT ---
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+
   const [summary, setSummary] = useState({ 
     open: 0, pctOpen: 0,
     progress: 0, pctProgress: 0,
@@ -110,6 +116,29 @@ export default function Dashboard() {
     }
   };
 
+  // --- HANDLER FILE ---
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setIsUploading(true);
+    
+    // SIMULASI UPLOAD (Ganti dengan logika upload Supabase/API Anda)
+    console.log("Mengupload file:", selectedFile.name);
+    
+    setTimeout(() => {
+        setIsUploading(false);
+        alert(`File ${selectedFile.name} berhasil diupload!`);
+        setIsModalOpen(false); // Tutup modal
+        setSelectedFile(null); // Reset file
+        // fetchHazardStatistics(); // Opsional: Refresh data
+    }, 1500);
+  };
+
   if (!isAuthorized) return <div className="h-screen bg-[#F8F9FA]"></div>;
 
   return (
@@ -121,19 +150,18 @@ export default function Dashboard() {
         <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-black">Dashboard</h1>
             
-            <Link href="/admin/import">
-            <button className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
+            {/* BUTTON IMPORT (Membuka Modal) */}
+            <button 
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
+            >
                 <UploadCloud size={16} />
                 Import File
             </button>
-            </Link>
         </div>
 
         {/* --- KOTAK PUTIH UTAMA (RINGKASAN) --- */}
-        {/* Style: "Full dikiri dan ga besar" */}
-        {/* max-w-[1050px] membatasi lebarnya agar tidak full screen, mr-auto membuatnya rata kiri */}
         <div className="w-full max-w-[1050px] mr-auto bg-white rounded-[1.5rem] p-8 shadow-sm mb-12 border border-gray-100">
-            
             {/* Header Dalam Kotak */}
             <div className="flex justify-between items-start mb-8 border-b border-gray-50 pb-4">
                 <div>
@@ -164,8 +192,6 @@ export default function Dashboard() {
         </div>
 
         {/* --- UNIT ANALYTICS (GRID BAWAH) --- */}
-        {/* Style: "Full width, gede, mentok kiri kanan" */}
-        {/* Grid cols diatur agar kartu tetap besar meskipun layar lebar (maksimal 4 kolom) */}
         <div className="w-full">
             <h3 className="text-xl font-bold text-gray-700 mb-6 border-l-4 border-[#005DAA] pl-3">
                 Detail Unit ({unitsData.length})
@@ -174,13 +200,9 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-12">
                 {unitsData.map((unit, idx) => (
                 <div key={idx} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300">
-                    
-                    {/* Judul Unit */}
                     <h4 className="text-base font-bold text-gray-700 mb-4 h-6 truncate uppercase">
                         {unit.name}
                     </h4>
-
-                    {/* Chart Unit */}
                     <div className="relative w-full h-40 flex justify-center items-end overflow-hidden mb-6">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -197,8 +219,6 @@ export default function Dashboard() {
                         </Pie>
                         </PieChart>
                     </ResponsiveContainer>
-                    
-                    {/* Persentase TL% */}
                     <div className="absolute bottom-0 mb-2 flex flex-col items-center">
                         <span className="text-3xl font-black text-[#005DAA] leading-none">
                             {unit.completion}%
@@ -206,8 +226,6 @@ export default function Dashboard() {
                         <span className="text-xs text-gray-400 font-bold mt-1">TL%</span>
                     </div>
                     </div>
-
-                    {/* Legend Unit */}
                     <div className="flex justify-between items-end px-2 gap-2">
                         {/* Open */}
                         <div className="flex gap-2 items-center">
@@ -217,7 +235,6 @@ export default function Dashboard() {
                                 <span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[0].value}</span>
                             </div>
                         </div>
-                        
                         {/* Progress */}
                         <div className="flex gap-2 items-center">
                             <div className="w-1.5 h-8 bg-[#10b981] rounded-full"></div>
@@ -226,7 +243,6 @@ export default function Dashboard() {
                                 <span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[1].value}</span>
                             </div>
                         </div>
-
                         {/* Close */}
                         <div className="flex gap-2 items-center">
                             <div className="w-1.5 h-8 bg-[#8b5cf6] rounded-full"></div>
@@ -235,7 +251,6 @@ export default function Dashboard() {
                                 <span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[2].value}</span>
                             </div>
                         </div>
-                        
                         {/* Total */}
                         <div className="flex gap-2 items-center border-l pl-4 border-gray-100">
                             <div className="w-1.5 h-8 bg-gray-400 rounded-full"></div>
@@ -251,6 +266,71 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {/* --- MODAL POP-UP IMPORT --- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
+            {/* Kotak Modal */}
+            <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+                
+                {/* Header Modal */}
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-800">Import Data</h3>
+                    <button 
+                        onClick={() => setIsModalOpen(false)}
+                        className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {/* Area Upload (Dashed) */}
+                <div className="relative group mb-6">
+                    <input 
+                        type="file" 
+                        accept=".xlsx, .xls, .csv"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div className={`border-2 border-dashed rounded-2xl h-52 flex flex-col items-center justify-center transition-all duration-300 ${selectedFile ? 'border-[#005DAA] bg-blue-50/50' : 'border-gray-300 bg-gray-50 group-hover:bg-gray-100'}`}>
+                        {selectedFile ? (
+                            <>
+                                <FileSpreadsheet size={48} className="text-[#005DAA] mb-3" />
+                                <p className="text-sm font-bold text-[#005DAA] truncate max-w-[80%] text-center px-4">{selectedFile.name}</p>
+                                <p className="text-xs text-gray-500 mt-1">{(selectedFile.size / 1024).toFixed(2)} KB</p>
+                            </>
+                        ) : (
+                            <>
+                                <div className="bg-white p-4 rounded-full shadow-sm mb-4">
+                                    <UploadCloud size={32} className="text-[#005DAA]" />
+                                </div>
+                                <p className="text-sm font-bold text-gray-700">Pilih File Excel Anda</p>
+                                <p className="text-xs text-gray-400 mt-1">Support: .xlsx, .csv</p>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Tombol Aksi */}
+                <div className="flex gap-3">
+                    <button 
+                        onClick={() => setIsModalOpen(false)}
+                        className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors text-sm"
+                    >
+                        Batal
+                    </button>
+                    <button 
+                        onClick={handleUpload}
+                        disabled={!selectedFile || isUploading}
+                        className={`flex-1 py-3 rounded-xl font-bold text-white text-sm transition-all flex justify-center items-center gap-2 ${!selectedFile ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#005DAA] hover:bg-blue-800 shadow-lg hover:shadow-xl'}`}
+                    >
+                        {isUploading ? 'Mengupload...' : 'Upload File'}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
     </Layout>
   );
 }
