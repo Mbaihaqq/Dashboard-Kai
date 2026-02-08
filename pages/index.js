@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
 import Layout from '../components/Layout';
+// Import komponen Modal Detail
 import DetailGrafik from '../components/DetailGrafik'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
-import { UploadCloud, X, FileSpreadsheet, ChevronDown, LayoutDashboard, BarChart3, Calendar, User, Eye } from 'lucide-react';
+import { UploadCloud, X, FileSpreadsheet } from 'lucide-react';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -13,18 +13,17 @@ export default function Dashboard() {
   
   // --- STATE DATA ---
   const [unitsData, setUnitsData] = useState([]);
-  const [hazardData, setHazardData] = useState([]); // Data mentah (akan auto-update saat fetch ulang)
+  const [hazardData, setHazardData] = useState([]); 
   
-  // --- STATE VIEW & ROLE ---
+  // --- STATE ROLE ---
   const [userRole, setUserRole] = useState(null); 
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false); 
-  const [selectedView, setSelectedView] = useState('Dashboard'); 
+  // HAPUS STATE DROPDOWN DI SINI KARENA SUDAH ADA DI LAYOUT
 
-  // --- STATE MODAL ---
+  // --- STATE MODAL IMPORT & DETAIL ---
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   
-  // State Data Pop-up
+  // State untuk Modal Detail Unit
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedUnitName, setSelectedUnitName] = useState('');
   const [selectedUnitRows, setSelectedUnitRows] = useState([]);
 
@@ -86,7 +85,7 @@ export default function Dashboard() {
         if (data && data.length > 0) { allData = [...allData, ...data]; from += 1000; to += 1000; } else { hasMore = false; }
       }
 
-      setHazardData(allData); // Simpan semua data terbaru ke state
+      setHazardData(allData);
 
       const grandTotal = allData.length;
       if (grandTotal === 0) return;
@@ -130,9 +129,6 @@ export default function Dashboard() {
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
-    
-    // Disini logika upload ke server/supabase Anda...
-    
     setTimeout(() => {
         setIsUploading(false);
         const now = formatDateTime(new Date());
@@ -140,29 +136,24 @@ export default function Dashboard() {
         localStorage.setItem('last_update_fixed', now); 
         
         alert(`File ${selectedFile.name} berhasil diupload!`);
-        
-        // PENTING: Panggil fetch ulang agar data hazardData terupdate dengan file baru
-        fetchHazardStatistics(); 
-        
+        fetchHazardStatistics(); // Refresh data
         setIsModalOpen(false);
         setSelectedFile(null);
     }, 1500);
   };
 
-  const handleViewChange = (viewName, path) => { setSelectedView(viewName); setIsDropdownOpen(false); };
-
-  // --- HANDLER KLIK UNIT (DENGAN FILTER STATUS) ---
+  // --- HANDLER KLIK UNIT (FILTER & SORT) ---
   const handleUnitClick = (unitName) => {
-    // 1. Ambil semua data milik unit ini
+    // 1. Ambil data unit
     const unitRows = hazardData.filter(item => item.unit?.trim() === unitName);
     
-    // 2. FILTER: Hanya ambil status 'Open' atau 'Work In Progress'
+    // 2. Filter status: Hapus 'Closed'
     const filteredRows = unitRows.filter(row => {
-        const status = row.status || row['Status']; // Handle kemungkinan nama kolom beda
+        const status = row.status || row['Status'];
         return status === 'Open' || status === 'Work In Progress';
     });
 
-    // 3. Sortir berdasarkan tanggal (Terbaru di atas)
+    // 3. Sort tanggal terbaru
     filteredRows.sort((a, b) => {
         const dateA = a['tanggal hazard'] || a['Tanggal Hazard'];
         const dateB = b['tanggal hazard'] || b['Tanggal Hazard'];
@@ -170,7 +161,7 @@ export default function Dashboard() {
     });
     
     setSelectedUnitName(unitName);
-    setSelectedUnitRows(filteredRows); // Set data yang sudah difilter ke modal
+    setSelectedUnitRows(filteredRows);
     setIsDetailModalOpen(true);
   };
 
@@ -181,28 +172,15 @@ export default function Dashboard() {
       <div className="w-full px-6 py-4">
         
         {/* --- HEADER PAGE --- */}
-        <div className="flex justify-between items-center mb-6 relative">
+        <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-black">Dashboard</h1>
             
-            {userRole === 'admin' ? (
+            {/* HANYA ADMIN YANG PUNYA TOMBOL DI SINI */}
+            {/* USER TIDAK MELIHAT APA-APA DI SINI KARENA MENU SUDAH DI LAYOUT */}
+            {userRole === 'admin' && (
                 <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
                     <UploadCloud size={16} /> Import File
                 </button>
-            ) : (
-                <div className="relative">
-                    <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-3 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 px-4 py-2 rounded-lg shadow-sm transition-all text-sm font-medium min-w-[160px] justify-between">
-                        <div className="flex items-center gap-2"><LayoutDashboard size={16} /><span>{selectedView}</span></div>
-                        <ChevronDown size={16} className={`transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    {isDropdownOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                            <div className="py-1">
-                                <button onClick={() => handleViewChange('Dashboard', '/')} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#005DAA] flex items-center gap-2"><LayoutDashboard size={14} />Dashboard</button>
-                                <button onClick={() => handleViewChange('TL% Analytics', '/tl-analytics')} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#005DAA] flex items-center gap-2"><BarChart3 size={14} />TL% Analytics</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
             )}
         </div>
 
@@ -232,11 +210,7 @@ export default function Dashboard() {
             <h3 className="text-xl font-bold text-gray-700 mb-6 border-l-4 border-[#005DAA] pl-3">Detail Unit ({unitsData.length})</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-12">
                 {unitsData.map((unit, idx) => (
-                <div 
-                    key={idx} 
-                    onClick={() => handleUnitClick(unit.name)} // KLIK DISINI MEMICU FILTER & BUKA MODAL
-                    className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300 cursor-pointer group relative hover:-translate-y-1"
-                >
+                <div key={idx} onClick={() => handleUnitClick(unit.name)} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300 cursor-pointer group relative hover:-translate-y-1">
                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow-md">Click Details</div>
                     </div>
@@ -258,7 +232,7 @@ export default function Dashboard() {
 
       </div>
 
-      {/* --- MODAL 1: IMPORT FILE (ADMIN ONLY) --- */}
+      {/* --- MODAL IMPORT (ADMIN ONLY) --- */}
       {userRole === 'admin' && isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
             <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
@@ -269,7 +243,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* --- MODAL 2: DETAIL UNIT TABLE --- */}
+      {/* --- MODAL DETAIL UNIT --- */}
       <DetailGrafik 
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
