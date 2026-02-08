@@ -28,7 +28,7 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
     return data[keyLower] || data[keyExcel] || '-';
   };
 
-  // Ambil URL Bukti
+  // Ambil URL Bukti (Prioritas: lowercase DB -> Excel -> Link Bukti)
   const buktiUrl = data.bukti_pelaporan || data['Bukti Pelaporan'] || data['Link Bukti'];
 
   return (
@@ -97,7 +97,7 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
 
             <hr className="border-gray-200" />
 
-            {/* Baris 5: BUKTI FOTO (Preview Image) */}
+            {/* Baris 5: BUKTI FOTO (Preview Image dengan Fix Referrer) */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Bukti Pelaporan</label>
                 {buktiUrl ? (
@@ -108,9 +108,11 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
                                 src={buktiUrl} 
                                 alt="Bukti Hazard" 
                                 className="object-contain w-full h-full"
+                                referrerPolicy="no-referrer"  // Bypass Referrer Block
+                                crossOrigin="anonymous"       // Handle CORS
                                 onError={(e) => {
                                     e.target.onerror = null; 
-                                    e.target.src = "https://placehold.co/600x400?text=Gagal+Muat+Gambar";
+                                    e.target.src = "https://placehold.co/600x400?text=Gambar+Tidak+Dapat+Diakses";
                                 }} 
                             />
                             {/* Overlay Button */}
@@ -125,7 +127,9 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
                                 </a>
                             </div>
                         </div>
-                        <p className="text-[10px] text-gray-400 truncate">{buktiUrl}</p>
+                        <p className="text-[10px] text-gray-400 truncate text-center mt-1 select-all cursor-text" title={buktiUrl}>
+                            {buktiUrl}
+                        </p>
                     </div>
                 ) : (
                     <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-center text-gray-400 text-sm">
