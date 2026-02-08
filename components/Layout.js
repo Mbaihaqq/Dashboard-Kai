@@ -136,7 +136,7 @@ export default function Layout({ children }) {
                 </Link>
                 
                 {/* MENU 3: HISTORY (PERBAIKAN LINK) */}
-                <Link href="/history">
+                <Link href="/History">
                     <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer flex items-center gap-2 ${router.pathname === '/history' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
                         <History size={16} />
                         Histori Penginputan Data
