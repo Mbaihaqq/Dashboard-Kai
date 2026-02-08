@@ -106,7 +106,7 @@ export default function HistoryPage() {
             {/* SEARCH BAR */}
             <div className="relative w-full md:w-80">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search size={16} className="text-gray-400" />
+                    <Search size={16} className="text-black-400" />
                 </div>
                 <input 
                     type="text" 
