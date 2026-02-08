@@ -6,8 +6,8 @@ import DetailGrafik from '../components/DetailGrafik';
 import DetailHazard from '../components/DetailHazard'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
-import { UploadCloud, X, FileSpreadsheet, ChevronDown, LayoutDashboard, BarChart3 } from 'lucide-react';
-import * as XLSX from 'xlsx'; // Pastikan sudah install: npm install xlsx
+import { UploadCloud, X, FileSpreadsheet, ChevronDown, LayoutDashboard, BarChart3, Loader2 } from 'lucide-react';
+import * as XLSX from 'xlsx'; // Pastikan install: npm install xlsx
 
 export default function Dashboard() {
   const router = useRouter();
@@ -19,9 +19,9 @@ export default function Dashboard() {
   const [userRole, setUserRole] = useState(null); 
 
   // --- STATE MODALS ---
-  const [isModalOpen, setIsModalOpen] = useState(false); // Modal Import
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false); // Modal Tabel List
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // Modal Edit Satuan
+  const [isModalOpen, setIsModalOpen] = useState(false); 
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false); 
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); 
   
   // State Data Pop-up & Edit
   const [selectedUnitName, setSelectedUnitName] = useState('');
@@ -31,6 +31,7 @@ export default function Dashboard() {
   // State Upload
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0); // Indikator Progress
   const [lastUpdate, setLastUpdate] = useState(''); 
 
   const [summary, setSummary] = useState({ open: 0, pctOpen: 0, progress: 0, pctProgress: 0, closed: 0, pctClosed: 0, total: 0 });
@@ -59,10 +60,10 @@ export default function Dashboard() {
     }
   }, [router]);
 
-  // --- 1. NORMALISASI DATA (Agar ID & Kolom selalu terbaca) ---
+  // --- 1. NORMALISASI DATA ---
   const normalizeData = (rawItem) => {
     return {
-        // ID Unik (Cek berbagai kemungkinan header Excel)
+        // ID Unik 
         no_pelaporan: rawItem['no_pelaporan'] || rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['report_no'] || `UNKNOWN-${Math.random()}`,
         
         // Data Lain
@@ -86,9 +87,7 @@ export default function Dashboard() {
         if (data && data.length > 0) { allData = [...allData, ...data]; from += 1000; to += 1000; } else { hasMore = false; }
       }
       
-      // Normalisasi data dari DB (biar aman)
       const cleanData = allData.map(normalizeData);
-      
       setHazardData(cleanData);
       calculateSummary(cleanData);
     } catch (error) { console.error("Error dashboard:", error.message); }
@@ -132,12 +131,13 @@ export default function Dashboard() {
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
   };
 
-  // --- HANDLER UPLOAD EXCEL ---
   const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
+  // --- HANDLER UPLOAD EXCEL (VERSI BATCHING / NYICIL) ---
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
+    setUploadProgress(0);
 
     try {
         const reader = new FileReader();
@@ -147,32 +147,56 @@ export default function Dashboard() {
             const sheetName = workbook.SheetNames[0];
             const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-            // 1. Normalisasi & Bersihkan Data
+            if (jsonData.length === 0) {
+                alert("File Excel kosong!");
+                setIsUploading(false);
+                return;
+            }
+
+            // 1. Normalisasi Data
             const formattedData = jsonData.map(normalizeData);
+            const totalRows = formattedData.length;
+            const batchSize = 500; // Kirim per 500 baris agar tidak time-out
 
-            // 2. Kirim ke Supabase
-            const { error } = await supabase.from('hazards').upsert(formattedData, { onConflict: 'no_pelaporan' });
+            // 2. Kirim ke Supabase dengan Batching
+            for (let i = 0; i < totalRows; i += batchSize) {
+                const batch = formattedData.slice(i, i + batchSize);
+                
+                const { error } = await supabase
+                    .from('hazards')
+                    .upsert(batch, { onConflict: 'no_pelaporan' });
 
-            if (error) throw error;
+                if (error) {
+                    console.error("Batch Error:", error);
+                    throw error; // Berhenti jika ada error
+                }
+
+                // Update Progress
+                const progress = Math.round(((i + batch.length) / totalRows) * 100);
+                setUploadProgress(progress);
+            }
 
             // 3. Sukses
             const now = formatDateTime(new Date());
             setLastUpdate(now); 
             localStorage.setItem('last_update_fixed', now); 
-            alert(`Berhasil upload ${formattedData.length} data!`);
+            
+            alert(`SUKSES! Berhasil mengupload ${totalRows} data.`);
             fetchHazardStatistics();
             setIsModalOpen(false);
             setSelectedFile(null);
             setIsUploading(false);
+            setUploadProgress(0);
         };
         reader.readAsArrayBuffer(selectedFile);
     } catch (error) {
         alert('Gagal Upload: ' + error.message);
         setIsUploading(false);
+        setUploadProgress(0);
     }
   };
 
-  // --- HANDLER KLIK UNIT (Filter & Sort) ---
+  // --- HANDLER LAINNYA ---
   const handleUnitClick = (unitName) => {
     refreshDetailModal(unitName, hazardData);
     setIsDetailModalOpen(true);
@@ -180,28 +204,20 @@ export default function Dashboard() {
 
   const refreshDetailModal = (unitName, currentData) => {
     const unitRows = currentData.filter(item => item.unit?.trim() === unitName);
-    
-    // Filter status: HANYA Open & In Progress
     const filteredRows = unitRows.filter(row => {
         return row.status === 'Open' || row.status === 'Work In Progress';
     });
-
-    // Sort tanggal terbaru
     filteredRows.sort((a, b) => new Date(b.tanggal_hazard) - new Date(a.tanggal_hazard));
-    
     setSelectedUnitName(unitName);
     setSelectedUnitRows(filteredRows);
   };
 
-  // --- HANDLER EDIT DATA ---
   const handleRowClick = (hazardItem) => {
     setSelectedHazardToEdit(hazardItem);
     setIsEditModalOpen(true);
   };
 
-  // --- LOGIKA SIMPAN STATUS (FIXED: ID MATCHING) ---
   const handleSaveStatus = async (itemToEdit, newStatus) => {
-    // 1. Ambil ID Unik
     const targetId = itemToEdit.no_pelaporan; 
 
     if (!targetId) {
@@ -210,7 +226,6 @@ export default function Dashboard() {
     }
 
     try {
-        // 2. Update Database Supabase
         const { error } = await supabase
             .from('hazards')
             .update({ status: newStatus })
@@ -218,20 +233,17 @@ export default function Dashboard() {
 
         if (error) throw error;
 
-        // 3. Update State Lokal (Hanya update 1 baris yang ID-nya cocok)
         const updatedData = hazardData.map(row => {
             if (row.no_pelaporan === targetId) {
-                return { ...row, status: newStatus }; // Update status baris ini
+                return { ...row, status: newStatus }; 
             }
-            return row; // Baris lain tetap sama
+            return row; 
         });
 
         setHazardData(updatedData);
         calculateSummary(updatedData);
-        refreshDetailModal(selectedUnitName, updatedData); // Refresh tabel popup
-
+        refreshDetailModal(selectedUnitName, updatedData); 
         alert("Status berhasil diperbarui!");
-
     } catch (error) {
         alert("Gagal update status: " + error.message);
     }
@@ -305,7 +317,21 @@ export default function Dashboard() {
             <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
                 <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-gray-800">Import Data</h3><button onClick={() => setIsModalOpen(false)} className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-red-500 transition-colors"><X size={24} /></button></div>
                 <div className="relative group mb-6"><input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" /><div className={`border-2 border-dashed rounded-2xl h-52 flex flex-col items-center justify-center transition-all duration-300 ${selectedFile ? 'border-[#005DAA] bg-blue-50/50' : 'border-gray-300 bg-gray-50 group-hover:bg-gray-100'}`}>{selectedFile ? (<><FileSpreadsheet size={48} className="text-[#005DAA] mb-3" /><p className="text-sm font-bold text-[#005DAA] truncate max-w-[80%] text-center px-4">{selectedFile.name}</p><p className="text-xs text-gray-500 mt-1">{(selectedFile.size / 1024).toFixed(2)} KB</p></>) : (<><div className="bg-white p-4 rounded-full shadow-sm mb-4"><UploadCloud size={32} className="text-[#005DAA]" /></div><p className="text-sm font-bold text-gray-700">Pilih File Excel Anda</p><p className="text-xs text-gray-400 mt-1">Support: .xlsx, .csv</p></>)}</div></div>
-                <div className="flex gap-3"><button onClick={() => setIsModalOpen(false)} className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors text-sm">Batal</button><button onClick={handleUpload} disabled={!selectedFile || isUploading} className={`flex-1 py-3 rounded-xl font-bold text-white text-sm transition-all flex justify-center items-center gap-2 ${!selectedFile ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#005DAA] hover:bg-blue-800 shadow-lg hover:shadow-xl'}`}>{isUploading ? 'Mengupload...' : 'Upload File'}</button></div>
+                
+                {/* PROGRESS BAR */}
+                {isUploading && (
+                    <div className="mb-4">
+                        <div className="flex justify-between text-xs font-bold text-gray-500 mb-1">
+                            <span>Mengupload ke Database...</span>
+                            <span>{uploadProgress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div className="bg-[#005DAA] h-2.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex gap-3"><button onClick={() => setIsModalOpen(false)} disabled={isUploading} className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors text-sm">Batal</button><button onClick={handleUpload} disabled={!selectedFile || isUploading} className={`flex-1 py-3 rounded-xl font-bold text-white text-sm transition-all flex justify-center items-center gap-2 ${!selectedFile || isUploading ? 'bg-gray-300 cursor-not-allowed' : 'bg-[#005DAA] hover:bg-blue-800 shadow-lg hover:shadow-xl'}`}>{isUploading ? <><Loader2 className="animate-spin" size={16}/> {uploadProgress}%</> : 'Upload File'}</button></div>
             </div>
         </div>
       )}
