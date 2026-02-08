@@ -68,7 +68,7 @@ export default function HistoryPage() {
                         <tr>
                             <th className="px-6 py-5 w-16 text-center">No</th>
                             <th className="px-6 py-5">Waktu Upload</th>
-                            <th className="px-6 py-5">Admin / User</th>
+                            <th className="px-6 py-5">Admin</th>
                             <th className="px-6 py-5">Nama File</th>
                             <th className="px-6 py-5 text-center">Total Data</th>
                         </tr>
