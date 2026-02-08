@@ -11,11 +11,14 @@ export default function Dashboard() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [unitsData, setUnitsData] = useState([]);
   
+  // --- STATE BARU: ROLE USER ---
+  const [userRole, setUserRole] = useState(null); 
+
   // --- STATE MODAL & TANGGAL ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(''); // State tanggal
+  const [lastUpdate, setLastUpdate] = useState(''); 
 
   const [summary, setSummary] = useState({ 
     open: 0, pctOpen: 0,
@@ -47,17 +50,19 @@ export default function Dashboard() {
       router.push('/loginPage/login');
     } else {
       setIsAuthorized(true);
+      
+      // 1. AMBIL ROLE DARI SESSION STORAGE
+      const role = sessionStorage.getItem('userRole');
+      setUserRole(role);
+
       fetchHazardStatistics();
 
       // --- LOGIKA TANGGAL (FIXED) ---
-      // 1. Cek apakah sudah ada tanggal di LocalStorage?
       const savedDate = localStorage.getItem('last_update_fixed');
       
       if (savedDate) {
-        // 2. Jika ada, pakai itu (JANGAN BUAT BARU)
         setLastUpdate(savedDate);
       } else {
-        // 3. Jika kosong (pertama kali buka), buat baru SEKALI SAJA dan simpan
         const initialDate = formatDateTime(new Date());
         setLastUpdate(initialDate);
         localStorage.setItem('last_update_fixed', initialDate);
@@ -152,8 +157,8 @@ export default function Dashboard() {
         
         // --- UPDATE TANGGAL HANYA DISINI ---
         const now = formatDateTime(new Date());
-        setLastUpdate(now); // Update tampilan
-        localStorage.setItem('last_update_fixed', now); // Simpan ke storage
+        setLastUpdate(now); 
+        localStorage.setItem('last_update_fixed', now); 
 
         alert(`File ${selectedFile.name} berhasil diupload!`);
         setIsModalOpen(false);
@@ -171,18 +176,19 @@ export default function Dashboard() {
         <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-black">Dashboard</h1>
             
-            {/* BUTTON IMPORT (Membuka Modal) */}
-            <button 
-                onClick={() => setIsModalOpen(true)}
-                className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
-            >
-                <UploadCloud size={16} />
-                Import File
-            </button>
+            {/* BUTTON IMPORT (HANYA MUNCUL JIKA ADMIN) */}
+            {userRole === 'admin' && (
+              <button 
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
+              >
+                  <UploadCloud size={16} />
+                  Import File
+              </button>
+            )}
         </div>
 
         {/* --- KOTAK PUTIH UTAMA (RINGKASAN) --- */}
-        {/* Dikembalikan ke style Design A: max-w-[1050px], mr-auto */}
         <div className="w-full max-w-[1050px] mr-auto bg-white rounded-[1.5rem] p-8 shadow-sm mb-12 border border-gray-100">
             
             {/* Header Dalam Kotak */}
@@ -249,7 +255,8 @@ export default function Dashboard() {
                         <span className="text-xs text-gray-400 font-bold mt-1">TL%</span>
                     </div>
                     </div>
-                    {/* Legend Unit - Style Lama */}
+                    
+                    {/* Legend Unit */}
                     <div className="flex justify-between items-end px-2 gap-2">
                         <div className="flex gap-2 items-center">
                             <div className="w-1.5 h-8 bg-[#f59e0b] rounded-full"></div>
@@ -287,8 +294,8 @@ export default function Dashboard() {
 
       </div>
 
-      {/* --- POP-UP MODAL IMPORT (FIXED) --- */}
-      {isModalOpen && (
+      {/* --- POP-UP MODAL IMPORT (HANYA RENDER JIKA ADMIN) --- */}
+      {userRole === 'admin' && isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
             <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
                 <div className="flex justify-between items-center mb-6">
