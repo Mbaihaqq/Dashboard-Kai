@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { Search, Menu, X, ChevronDown, LayoutDashboard, BarChart3 } from 'lucide-react'; // Tambah icon baru
+import { Search, Menu, X, ChevronDown, LayoutDashboard, BarChart3 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
 export default function Layout({ children }) {
@@ -56,7 +56,7 @@ export default function Layout({ children }) {
              />
           </div>
 
-          {/* 3. TENGAH-KANAN: DROPDOWN MENU (KHUSUS USER) */}
+          {/* 3. TENGAH-KANAN: DROPDOWN MENU (HANYA UNTUK USER) */}
           {role === 'user' && (
             <div className="hidden md:block relative mr-6">
                 <button 
@@ -82,7 +82,7 @@ export default function Layout({ children }) {
                                 Dashboard
                             </button>
                             <button 
-                                onClick={() => handlePageChange('TL% Analytics', '/tl-analytics')} // Ganti path sesuai kebutuhan
+                                onClick={() => handlePageChange('TL% Analytics', '/tl-analytics')} 
                                 className="w-full text-left px-4 py-3 text-sm text-gray-600 hover:bg-blue-50 hover:text-[#005DAA] flex items-center gap-3"
                             >
                                 <BarChart3 size={16} />
@@ -113,8 +113,8 @@ export default function Layout({ children }) {
         </div>
       </nav>
 
-      {/* --- BARIS 2: NAVIGATION BAR (KHUSUS ADMIN) --- */}
-      {/* Baris ini HILANG jika role == 'user' */}
+      {/* --- BARIS 2: NAVIGATION BAR (HANYA UNTUK ADMIN) --- */}
+      {/* User TIDAK AKAN melihat bar oranye ini sama sekali */}
       {role === 'admin' && (
         <div className="bg-[#E85D18] shadow-md relative z-40 hidden md:block">
             <div className="w-full px-8 flex items-center gap-1 h-12">
