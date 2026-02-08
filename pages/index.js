@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
-// Import komponen Modal Detail
-import DetailGrafik from '../components/DetailGrafik'; 
+// --- IMPORT KOMPONEN ---
+import DetailGrafik from '../components/DetailGrafik'; // Tabel List Hazard
+import DetailHazard from '../components/DetailHazard'; // Modal Edit Satu Hazard (Yg Baru)
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
-import { UploadCloud, X, FileSpreadsheet } from 'lucide-react';
+import { UploadCloud, X, FileSpreadsheet, ChevronDown, LayoutDashboard, BarChart3 } from 'lucide-react';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -14,41 +15,28 @@ export default function Dashboard() {
   // --- STATE DATA ---
   const [unitsData, setUnitsData] = useState([]);
   const [hazardData, setHazardData] = useState([]); 
-  
-  // --- STATE ROLE ---
   const [userRole, setUserRole] = useState(null); 
-  // HAPUS STATE DROPDOWN DI SINI KARENA SUDAH ADA DI LAYOUT
 
-  // --- STATE MODAL IMPORT & DETAIL ---
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // --- STATE MODALS ---
+  const [isModalOpen, setIsModalOpen] = useState(false); // Modal Import
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false); // Modal Tabel List
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // Modal Edit Satuan
   
-  // State untuk Modal Detail Unit
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  // State Data Pop-up & Edit
   const [selectedUnitName, setSelectedUnitName] = useState('');
   const [selectedUnitRows, setSelectedUnitRows] = useState([]);
+  const [selectedHazardToEdit, setSelectedHazardToEdit] = useState(null); // Data yg mau diedit
 
   // State Upload
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(''); 
 
-  const [summary, setSummary] = useState({ 
-    open: 0, pctOpen: 0,
-    progress: 0, pctProgress: 0,
-    closed: 0, pctClosed: 0,
-    total: 0
-  });
+  const [summary, setSummary] = useState({ open: 0, pctOpen: 0, progress: 0, pctProgress: 0, closed: 0, pctClosed: 0, total: 0 });
 
-  const COLORS = {
-    new: '#ef4444', open: '#f59e0b', progress: '#10b981', closed: '#8b5cf6', empty: '#e5e7eb'
-  };
+  const COLORS = { new: '#ef4444', open: '#f59e0b', progress: '#10b981', closed: '#8b5cf6', empty: '#e5e7eb' };
 
-  const formatDateTime = (date) => {
-    return new Date(date).toLocaleString('id-ID', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    }).replace(/\./g, ':');
-  };
+  const formatDateTime = (date) => new Date(date).toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
 
   useEffect(() => {
     const loggedIn = sessionStorage.getItem('isLoggedIn');
@@ -56,15 +44,12 @@ export default function Dashboard() {
       router.push('/loginPage/login');
     } else {
       setIsAuthorized(true);
-      const role = sessionStorage.getItem('userRole');
-      setUserRole(role);
-      
+      setUserRole(sessionStorage.getItem('userRole'));
       fetchHazardStatistics();
-
+      
       const savedDate = localStorage.getItem('last_update_fixed');
-      if (savedDate) {
-        setLastUpdate(savedDate);
-      } else {
+      if (savedDate) setLastUpdate(savedDate);
+      else {
         const initialDate = formatDateTime(new Date());
         setLastUpdate(initialDate);
         localStorage.setItem('last_update_fixed', initialDate);
@@ -75,56 +60,38 @@ export default function Dashboard() {
   const fetchHazardStatistics = async () => {
     try {
       let allData = [];
-      let from = 0;
-      let to = 999;
-      let hasMore = true;
-
+      let from = 0; let to = 999; let hasMore = true;
       while (hasMore) {
         const { data, error } = await supabase.from('hazards').select('*').range(from, to);
         if (error) throw error;
         if (data && data.length > 0) { allData = [...allData, ...data]; from += 1000; to += 1000; } else { hasMore = false; }
       }
-
       setHazardData(allData);
+      calculateSummary(allData);
+    } catch (error) { console.error("Error dashboard:", error.message); }
+  };
 
-      const grandTotal = allData.length;
+  const calculateSummary = (data) => {
+      const grandTotal = data.length;
       if (grandTotal === 0) return;
-
-      const tOpen = allData.filter(d => d.status === 'Open').length;
-      const tProg = allData.filter(d => d.status === 'Work In Progress').length;
-      const tClosed = allData.filter(d => d.status === 'Closed').length;
-      
-      setSummary({
-        open: tOpen, pctOpen: Math.round((tOpen / grandTotal) * 100) || 0,
-        progress: tProg, pctProgress: Math.round((tProg / grandTotal) * 100) || 0,
-        closed: tClosed, pctClosed: Math.round((tClosed / grandTotal) * 100) || 0,
-        total: grandTotal
-      });
-
-      const allUniqueUnits = [...new Set(allData.map(item => item.unit?.trim()))].filter(Boolean);
+      const tOpen = data.filter(d => d.status === 'Open').length;
+      const tProg = data.filter(d => d.status === 'Work In Progress').length;
+      const tClosed = data.filter(d => d.status === 'Closed').length;
+      setSummary({ open: tOpen, pctOpen: Math.round((tOpen / grandTotal) * 100) || 0, progress: tProg, pctProgress: Math.round((tProg / grandTotal) * 100) || 0, closed: tClosed, pctClosed: Math.round((tClosed / grandTotal) * 100) || 0, total: grandTotal });
+      const allUniqueUnits = [...new Set(data.map(item => item.unit?.trim()))].filter(Boolean);
       const formattedUnits = allUniqueUnits.map(unitName => {
-        const unitItems = allData.filter(d => d.unit?.trim() === unitName);
+        const unitItems = data.filter(d => d.unit?.trim() === unitName);
         const total = unitItems.length;
         const closed = unitItems.filter(d => d.status === 'Closed').length;
         const progress = unitItems.filter(d => d.status === 'Work In Progress').length;
         const open = unitItems.filter(d => d.status === 'Open').length;
         const completion = total > 0 ? Math.round((closed / total) * 100) : 0;
-
-        return {
-          name: unitName, total, completion,
-          chartData: [
-            { name: 'Open', value: open, color: COLORS.open },
-            { name: 'Progress', value: progress, color: COLORS.progress },
-            { name: 'Closed', value: closed, color: COLORS.closed }
-          ]
-        };
+        return { name: unitName, total, completion, chartData: [{ name: 'Open', value: open, color: COLORS.open }, { name: 'Progress', value: progress, color: COLORS.progress }, { name: 'Closed', value: closed, color: COLORS.closed }] };
       });
-
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (error) { console.error("Error dashboard:", error.message); }
   };
 
-  const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) setSelectedFile(e.target.files[0]); };
+  const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
   const handleUpload = async () => {
     if (!selectedFile) return;
@@ -134,35 +101,65 @@ export default function Dashboard() {
         const now = formatDateTime(new Date());
         setLastUpdate(now); 
         localStorage.setItem('last_update_fixed', now); 
-        
         alert(`File ${selectedFile.name} berhasil diupload!`);
-        fetchHazardStatistics(); // Refresh data
+        fetchHazardStatistics();
         setIsModalOpen(false);
         setSelectedFile(null);
     }, 1500);
   };
 
-  // --- HANDLER KLIK UNIT (FILTER & SORT) ---
+  // --- LOGIKA KLIK UNIT (Buka Tabel List) ---
   const handleUnitClick = (unitName) => {
+    refreshDetailModal(unitName, hazardData);
+    setIsDetailModalOpen(true);
+  };
+
+  const refreshDetailModal = (unitName, currentData) => {
     // 1. Ambil data unit
-    const unitRows = hazardData.filter(item => item.unit?.trim() === unitName);
-    
-    // 2. Filter status: Hapus 'Closed'
+    const unitRows = currentData.filter(item => item.unit?.trim() === unitName);
+    // 2. Filter: HANYA Open & In Progress
     const filteredRows = unitRows.filter(row => {
         const status = row.status || row['Status'];
         return status === 'Open' || status === 'Work In Progress';
     });
-
-    // 3. Sort tanggal terbaru
+    // 3. Sort tanggal
     filteredRows.sort((a, b) => {
         const dateA = a['tanggal hazard'] || a['Tanggal Hazard'];
         const dateB = b['tanggal hazard'] || b['Tanggal Hazard'];
         return new Date(dateB) - new Date(dateA);
     });
-    
     setSelectedUnitName(unitName);
     setSelectedUnitRows(filteredRows);
-    setIsDetailModalOpen(true);
+  };
+
+  // --- LOGIKA KLIK BARIS (Buka Modal DetailHazard) ---
+  const handleRowClick = (hazardItem) => {
+    setSelectedHazardToEdit(hazardItem);
+    setIsEditModalOpen(true); // Buka modal DetailHazard.js
+  };
+
+  // --- LOGIKA SIMPAN STATUS ---
+  const handleSaveStatus = async (item, newStatus) => {
+    // Update State Lokal (Optimistic UI)
+    const updatedData = hazardData.map(row => {
+        const idA = row['no. pelaporan'] || row['No. Pelaporan'];
+        const idB = item['no. pelaporan'] || item['No. Pelaporan'];
+        if (idA === idB) {
+            return { ...row, status: newStatus, Status: newStatus }; 
+        }
+        return row;
+    });
+
+    // Update Master Data
+    setHazardData(updatedData);
+    calculateSummary(updatedData);
+
+    // Refresh Tabel (Otomatis menghilangkan item jika status jadi Closed)
+    refreshDetailModal(selectedUnitName, updatedData);
+
+    // NOTE: Disini tempat Anda menambahkan kode `await supabase.from(...).update(...)`
+    
+    alert(`Status berhasil diubah menjadi: ${newStatus}`);
   };
 
   if (!isAuthorized) return <div className="h-screen bg-[#F8F9FA]"></div>;
@@ -171,12 +168,9 @@ export default function Dashboard() {
     <Layout>
       <div className="w-full px-6 py-4">
         
-        {/* --- HEADER PAGE --- */}
+        {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-black">Dashboard</h1>
-            
-            {/* HANYA ADMIN YANG PUNYA TOMBOL DI SINI */}
-            {/* USER TIDAK MELIHAT APA-APA DI SINI KARENA MENU SUDAH DI LAYOUT */}
             {userRole === 'admin' && (
                 <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
                     <UploadCloud size={16} /> Import File
@@ -184,7 +178,7 @@ export default function Dashboard() {
             )}
         </div>
 
-        {/* --- SUMMARY CARD --- */}
+        {/* SUMMARY */}
         <div className="w-full max-w-[1050px] mr-auto bg-white rounded-[1.5rem] p-8 shadow-sm mb-12 border border-gray-100">
             <div className="flex justify-between items-start mb-8 border-b border-gray-50 pb-4">
                 <div>
@@ -205,15 +199,13 @@ export default function Dashboard() {
             </div>
         </div>
 
-        {/* --- UNIT ANALYTICS --- */}
+        {/* UNIT ANALYTICS */}
         <div className="w-full">
             <h3 className="text-xl font-bold text-gray-700 mb-6 border-l-4 border-[#005DAA] pl-3">Detail Unit ({unitsData.length})</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-12">
                 {unitsData.map((unit, idx) => (
                 <div key={idx} onClick={() => handleUnitClick(unit.name)} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300 cursor-pointer group relative hover:-translate-y-1">
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow-md">Click Details</div>
-                    </div>
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><div className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow-md">Click Details</div></div>
                     <h4 className="text-base font-bold text-gray-700 mb-4 h-6 truncate uppercase">{unit.name}</h4>
                     <div className="relative w-full h-40 flex justify-center items-end overflow-hidden mb-6">
                         <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={unit.chartData} cx="50%" cy="100%" startAngle={180} endAngle={0} innerRadius={70} outerRadius={100} paddingAngle={2} dataKey="value" stroke="none">{unit.chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie></PieChart></ResponsiveContainer>
@@ -232,7 +224,7 @@ export default function Dashboard() {
 
       </div>
 
-      {/* --- MODAL IMPORT (ADMIN ONLY) --- */}
+      {/* --- MODAL 1: IMPORT FILE (ADMIN ONLY) --- */}
       {userRole === 'admin' && isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
             <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
@@ -243,12 +235,21 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* --- MODAL DETAIL UNIT --- */}
+      {/* --- MODAL 2: TABEL LIST HAZARD --- */}
       <DetailGrafik 
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
         unitName={selectedUnitName}
         data={selectedUnitRows}
+        onRowClick={handleRowClick} 
+      />
+
+      {/* --- MODAL 3: DETAIL HAZARD & EDIT STATUS (NEW) --- */}
+      <DetailHazard 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        data={selectedHazardToEdit}
+        onSave={handleSaveStatus}
       />
 
     </Layout>
