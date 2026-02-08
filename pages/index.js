@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 // Import Komponen
-import DetailGrafik from '../components/DetailGrafik'; // Tabel List Hazard
-import DetailHazard from '../components/DetailHazard'; // Modal Edit Satu Hazard
+import DetailGrafik from '../components/DetailGrafik'; 
+import DetailHazard from '../components/DetailHazard'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
 import { UploadCloud, X, FileSpreadsheet, ChevronDown, LayoutDashboard, BarChart3 } from 'lucide-react';
+import * as XLSX from 'xlsx'; // Pastikan sudah install: npm install xlsx
 
 export default function Dashboard() {
   const router = useRouter();
@@ -58,6 +59,23 @@ export default function Dashboard() {
     }
   }, [router]);
 
+  // --- 1. NORMALISASI DATA (Agar ID & Kolom selalu terbaca) ---
+  const normalizeData = (rawItem) => {
+    return {
+        // ID Unik (Cek berbagai kemungkinan header Excel)
+        no_pelaporan: rawItem['no_pelaporan'] || rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['report_no'] || `UNKNOWN-${Math.random()}`,
+        
+        // Data Lain
+        tanggal_hazard: rawItem['tanggal_hazard'] || rawItem['Tanggal Hazard'] || rawItem['Tanggal'] || null,
+        unit: rawItem['unit'] || rawItem['Unit'] || 'Unknown',
+        uraian: rawItem['uraian'] || rawItem['Uraian'] || rawItem['Uraian Hazard'] || '-',
+        status: rawItem['status'] || rawItem['Status'] || 'Open',
+        pic: rawItem['pic'] || rawItem['PIC'] || '-',
+        lokasi: rawItem['lokasi'] || rawItem['Lokasi'] || '-',
+        bukti_pelaporan: rawItem['bukti_pelaporan'] || rawItem['Bukti Pelaporan'] || rawItem['Link Bukti'] || null
+    };
+  };
+
   const fetchHazardStatistics = async () => {
     try {
       let allData = [];
@@ -67,19 +85,22 @@ export default function Dashboard() {
         if (error) throw error;
         if (data && data.length > 0) { allData = [...allData, ...data]; from += 1000; to += 1000; } else { hasMore = false; }
       }
-      setHazardData(allData);
-      calculateSummary(allData);
+      
+      // Normalisasi data dari DB (biar aman)
+      const cleanData = allData.map(normalizeData);
+      
+      setHazardData(cleanData);
+      calculateSummary(cleanData);
     } catch (error) { console.error("Error dashboard:", error.message); }
   };
 
-  // Helper hitung ulang (dipisah agar bisa dipanggil saat update lokal)
   const calculateSummary = (data) => {
       const grandTotal = data.length;
       if (grandTotal === 0) return;
 
-      const tOpen = data.filter(d => (d.status || d['Status']) === 'Open').length;
-      const tProg = data.filter(d => (d.status || d['Status']) === 'Work In Progress').length;
-      const tClosed = data.filter(d => (d.status || d['Status']) === 'Closed').length;
+      const tOpen = data.filter(d => d.status === 'Open').length;
+      const tProg = data.filter(d => d.status === 'Work In Progress').length;
+      const tClosed = data.filter(d => d.status === 'Closed').length;
       
       setSummary({
         open: tOpen, pctOpen: Math.round((tOpen / grandTotal) * 100) || 0,
@@ -88,14 +109,14 @@ export default function Dashboard() {
         total: grandTotal
       });
 
-      const allUniqueUnits = [...new Set(data.map(item => (item.unit || item['Unit'])?.trim()))].filter(Boolean);
+      const allUniqueUnits = [...new Set(data.map(item => item.unit?.trim()))].filter(Boolean);
       
       const formattedUnits = allUniqueUnits.map(unitName => {
-        const unitItems = data.filter(d => (d.unit || d['Unit'])?.trim() === unitName);
+        const unitItems = data.filter(d => d.unit?.trim() === unitName);
         const total = unitItems.length;
-        const closed = unitItems.filter(d => (d.status || d['Status']) === 'Closed').length;
-        const progress = unitItems.filter(d => (d.status || d['Status']) === 'Work In Progress').length;
-        const open = unitItems.filter(d => (d.status || d['Status']) === 'Open').length;
+        const closed = unitItems.filter(d => d.status === 'Closed').length;
+        const progress = unitItems.filter(d => d.status === 'Work In Progress').length;
+        const open = unitItems.filter(d => d.status === 'Open').length;
         
         const completion = total > 0 ? Math.round((closed / total) * 100) : 0;
 
@@ -111,101 +132,109 @@ export default function Dashboard() {
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
   };
 
+  // --- HANDLER UPLOAD EXCEL ---
   const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
-    setTimeout(() => {
+
+    try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+            // 1. Normalisasi & Bersihkan Data
+            const formattedData = jsonData.map(normalizeData);
+
+            // 2. Kirim ke Supabase
+            const { error } = await supabase.from('hazards').upsert(formattedData, { onConflict: 'no_pelaporan' });
+
+            if (error) throw error;
+
+            // 3. Sukses
+            const now = formatDateTime(new Date());
+            setLastUpdate(now); 
+            localStorage.setItem('last_update_fixed', now); 
+            alert(`Berhasil upload ${formattedData.length} data!`);
+            fetchHazardStatistics();
+            setIsModalOpen(false);
+            setSelectedFile(null);
+            setIsUploading(false);
+        };
+        reader.readAsArrayBuffer(selectedFile);
+    } catch (error) {
+        alert('Gagal Upload: ' + error.message);
         setIsUploading(false);
-        const now = formatDateTime(new Date());
-        setLastUpdate(now); 
-        localStorage.setItem('last_update_fixed', now); 
-        alert(`File ${selectedFile.name} berhasil diupload!`);
-        fetchHazardStatistics();
-        setIsModalOpen(false);
-        setSelectedFile(null);
-    }, 1500);
+    }
   };
 
-  // --- LOGIKA KLIK UNIT (Pop-up Tabel) ---
+  // --- HANDLER KLIK UNIT (Filter & Sort) ---
   const handleUnitClick = (unitName) => {
     refreshDetailModal(unitName, hazardData);
     setIsDetailModalOpen(true);
   };
 
   const refreshDetailModal = (unitName, currentData) => {
-    // 1. Ambil data unit
-    const unitRows = currentData.filter(item => (item.unit || item['Unit'])?.trim() === unitName);
+    const unitRows = currentData.filter(item => item.unit?.trim() === unitName);
     
-    // 2. Filter: HANYA Open & In Progress
+    // Filter status: HANYA Open & In Progress
     const filteredRows = unitRows.filter(row => {
-        const status = row.status || row['Status'];
-        return status === 'Open' || status === 'Work In Progress';
+        return row.status === 'Open' || row.status === 'Work In Progress';
     });
 
-    // 3. Sort tanggal
-    filteredRows.sort((a, b) => {
-        const dateA = a['tanggal hazard'] || a['Tanggal Hazard'];
-        const dateB = b['tanggal hazard'] || b['Tanggal Hazard'];
-        return new Date(dateB) - new Date(dateA);
-    });
+    // Sort tanggal terbaru
+    filteredRows.sort((a, b) => new Date(b.tanggal_hazard) - new Date(a.tanggal_hazard));
     
     setSelectedUnitName(unitName);
     setSelectedUnitRows(filteredRows);
   };
 
-  // --- LOGIKA KLIK BARIS (Buka Edit Modal) ---
+  // --- HANDLER EDIT DATA ---
   const handleRowClick = (hazardItem) => {
     setSelectedHazardToEdit(hazardItem);
     setIsEditModalOpen(true);
   };
 
-  // --- LOGIKA SIMPAN STATUS (PERBAIKAN PENTING DI SINI) ---
+  // --- LOGIKA SIMPAN STATUS (FIXED: ID MATCHING) ---
   const handleSaveStatus = async (itemToEdit, newStatus) => {
-    // 1. Dapatkan ID Unik dari item yang sedang diedit (No. Pelaporan)
-    const targetId = itemToEdit['no. pelaporan'] || itemToEdit['No. Pelaporan'];
+    // 1. Ambil ID Unik
+    const targetId = itemToEdit.no_pelaporan; 
 
     if (!targetId) {
-        alert("Gagal mengupdate: Data tidak memiliki No. Pelaporan.");
+        alert("Gagal: Data tidak memiliki No. Pelaporan.");
         return;
     }
 
-    // 2. Update State Lokal secara spesifik (HANYA ITEM YANG COCOK)
-    const updatedData = hazardData.map(row => {
-        const rowId = row['no. pelaporan'] || row['No. Pelaporan'];
-        
-        // JIKA ID COCOK, BARU UPDATE STATUSNYA
-        if (rowId === targetId) {
-            // Kita buat object baru dengan status yang diubah
-            return { 
-                ...row, 
-                status: newStatus, 
-                Status: newStatus // jaga-jaga kalau backend pake case sensitive
-            }; 
-        }
-        // JIKA ID BEDA, KEMBALIKAN DATA ASLI (JANGAN DIUBAH)
-        return row;
-    });
+    try {
+        // 2. Update Database Supabase
+        const { error } = await supabase
+            .from('hazards')
+            .update({ status: newStatus })
+            .eq('no_pelaporan', targetId);
 
-    // 3. Update Master Data State & Recalculate Charts
-    setHazardData(updatedData);
-    calculateSummary(updatedData);
+        if (error) throw error;
 
-    // 4. Refresh Tampilan Modal Detail (Supaya yang Closed langsung hilang dari list aktif)
-    refreshDetailModal(selectedUnitName, updatedData);
+        // 3. Update State Lokal (Hanya update 1 baris yang ID-nya cocok)
+        const updatedData = hazardData.map(row => {
+            if (row.no_pelaporan === targetId) {
+                return { ...row, status: newStatus }; // Update status baris ini
+            }
+            return row; // Baris lain tetap sama
+        });
 
-    // 5. (Opsional) Update ke Database Supabase
-    /*
-    const { error } = await supabase
-        .from('hazards')
-        .update({ status: newStatus })
-        .eq('no. pelaporan', targetId);
-    
-    if (error) console.error("Gagal update DB:", error);
-    */
+        setHazardData(updatedData);
+        calculateSummary(updatedData);
+        refreshDetailModal(selectedUnitName, updatedData); // Refresh tabel popup
 
-    alert(`Status berhasil diubah menjadi: ${newStatus}`);
+        alert("Status berhasil diperbarui!");
+
+    } catch (error) {
+        alert("Gagal update status: " + error.message);
+    }
   };
 
   if (!isAuthorized) return <div className="h-screen bg-[#F8F9FA]"></div>;
