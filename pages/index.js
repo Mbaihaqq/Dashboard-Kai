@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
-// --- IMPORT KOMPONEN ---
+// Import Komponen
 import DetailGrafik from '../components/DetailGrafik'; // Tabel List Hazard
-import DetailHazard from '../components/DetailHazard'; // Modal Edit Satu Hazard (Yg Baru)
+import DetailHazard from '../components/DetailHazard'; // Modal Edit Satu Hazard
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
 import { UploadCloud, X, FileSpreadsheet, ChevronDown, LayoutDashboard, BarChart3 } from 'lucide-react';
@@ -25,7 +25,7 @@ export default function Dashboard() {
   // State Data Pop-up & Edit
   const [selectedUnitName, setSelectedUnitName] = useState('');
   const [selectedUnitRows, setSelectedUnitRows] = useState([]);
-  const [selectedHazardToEdit, setSelectedHazardToEdit] = useState(null); // Data yg mau diedit
+  const [selectedHazardToEdit, setSelectedHazardToEdit] = useState(null); 
 
   // State Upload
   const [selectedFile, setSelectedFile] = useState(null);
@@ -45,8 +45,9 @@ export default function Dashboard() {
     } else {
       setIsAuthorized(true);
       setUserRole(sessionStorage.getItem('userRole'));
-      fetchHazardStatistics();
       
+      fetchHazardStatistics();
+
       const savedDate = localStorage.getItem('last_update_fixed');
       if (savedDate) setLastUpdate(savedDate);
       else {
@@ -71,22 +72,41 @@ export default function Dashboard() {
     } catch (error) { console.error("Error dashboard:", error.message); }
   };
 
+  // Helper hitung ulang (dipisah agar bisa dipanggil saat update lokal)
   const calculateSummary = (data) => {
       const grandTotal = data.length;
       if (grandTotal === 0) return;
-      const tOpen = data.filter(d => d.status === 'Open').length;
-      const tProg = data.filter(d => d.status === 'Work In Progress').length;
-      const tClosed = data.filter(d => d.status === 'Closed').length;
-      setSummary({ open: tOpen, pctOpen: Math.round((tOpen / grandTotal) * 100) || 0, progress: tProg, pctProgress: Math.round((tProg / grandTotal) * 100) || 0, closed: tClosed, pctClosed: Math.round((tClosed / grandTotal) * 100) || 0, total: grandTotal });
-      const allUniqueUnits = [...new Set(data.map(item => item.unit?.trim()))].filter(Boolean);
+
+      const tOpen = data.filter(d => (d.status || d['Status']) === 'Open').length;
+      const tProg = data.filter(d => (d.status || d['Status']) === 'Work In Progress').length;
+      const tClosed = data.filter(d => (d.status || d['Status']) === 'Closed').length;
+      
+      setSummary({
+        open: tOpen, pctOpen: Math.round((tOpen / grandTotal) * 100) || 0,
+        progress: tProg, pctProgress: Math.round((tProg / grandTotal) * 100) || 0,
+        closed: tClosed, pctClosed: Math.round((tClosed / grandTotal) * 100) || 0,
+        total: grandTotal
+      });
+
+      const allUniqueUnits = [...new Set(data.map(item => (item.unit || item['Unit'])?.trim()))].filter(Boolean);
+      
       const formattedUnits = allUniqueUnits.map(unitName => {
-        const unitItems = data.filter(d => d.unit?.trim() === unitName);
+        const unitItems = data.filter(d => (d.unit || d['Unit'])?.trim() === unitName);
         const total = unitItems.length;
-        const closed = unitItems.filter(d => d.status === 'Closed').length;
-        const progress = unitItems.filter(d => d.status === 'Work In Progress').length;
-        const open = unitItems.filter(d => d.status === 'Open').length;
+        const closed = unitItems.filter(d => (d.status || d['Status']) === 'Closed').length;
+        const progress = unitItems.filter(d => (d.status || d['Status']) === 'Work In Progress').length;
+        const open = unitItems.filter(d => (d.status || d['Status']) === 'Open').length;
+        
         const completion = total > 0 ? Math.round((closed / total) * 100) : 0;
-        return { name: unitName, total, completion, chartData: [{ name: 'Open', value: open, color: COLORS.open }, { name: 'Progress', value: progress, color: COLORS.progress }, { name: 'Closed', value: closed, color: COLORS.closed }] };
+
+        return {
+          name: unitName, total, completion,
+          chartData: [
+            { name: 'Open', value: open, color: COLORS.open },
+            { name: 'Progress', value: progress, color: COLORS.progress },
+            { name: 'Closed', value: closed, color: COLORS.closed }
+          ]
+        };
       });
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
   };
@@ -108,7 +128,7 @@ export default function Dashboard() {
     }, 1500);
   };
 
-  // --- LOGIKA KLIK UNIT (Buka Tabel List) ---
+  // --- LOGIKA KLIK UNIT (Pop-up Tabel) ---
   const handleUnitClick = (unitName) => {
     refreshDetailModal(unitName, hazardData);
     setIsDetailModalOpen(true);
@@ -116,49 +136,75 @@ export default function Dashboard() {
 
   const refreshDetailModal = (unitName, currentData) => {
     // 1. Ambil data unit
-    const unitRows = currentData.filter(item => item.unit?.trim() === unitName);
+    const unitRows = currentData.filter(item => (item.unit || item['Unit'])?.trim() === unitName);
+    
     // 2. Filter: HANYA Open & In Progress
     const filteredRows = unitRows.filter(row => {
         const status = row.status || row['Status'];
         return status === 'Open' || status === 'Work In Progress';
     });
+
     // 3. Sort tanggal
     filteredRows.sort((a, b) => {
         const dateA = a['tanggal hazard'] || a['Tanggal Hazard'];
         const dateB = b['tanggal hazard'] || b['Tanggal Hazard'];
         return new Date(dateB) - new Date(dateA);
     });
+    
     setSelectedUnitName(unitName);
     setSelectedUnitRows(filteredRows);
   };
 
-  // --- LOGIKA KLIK BARIS (Buka Modal DetailHazard) ---
+  // --- LOGIKA KLIK BARIS (Buka Edit Modal) ---
   const handleRowClick = (hazardItem) => {
     setSelectedHazardToEdit(hazardItem);
-    setIsEditModalOpen(true); // Buka modal DetailHazard.js
+    setIsEditModalOpen(true);
   };
 
-  // --- LOGIKA SIMPAN STATUS ---
-  const handleSaveStatus = async (item, newStatus) => {
-    // Update State Lokal (Optimistic UI)
+  // --- LOGIKA SIMPAN STATUS (PERBAIKAN PENTING DI SINI) ---
+  const handleSaveStatus = async (itemToEdit, newStatus) => {
+    // 1. Dapatkan ID Unik dari item yang sedang diedit (No. Pelaporan)
+    const targetId = itemToEdit['no. pelaporan'] || itemToEdit['No. Pelaporan'];
+
+    if (!targetId) {
+        alert("Gagal mengupdate: Data tidak memiliki No. Pelaporan.");
+        return;
+    }
+
+    // 2. Update State Lokal secara spesifik (HANYA ITEM YANG COCOK)
     const updatedData = hazardData.map(row => {
-        const idA = row['no. pelaporan'] || row['No. Pelaporan'];
-        const idB = item['no. pelaporan'] || item['No. Pelaporan'];
-        if (idA === idB) {
-            return { ...row, status: newStatus, Status: newStatus }; 
+        const rowId = row['no. pelaporan'] || row['No. Pelaporan'];
+        
+        // JIKA ID COCOK, BARU UPDATE STATUSNYA
+        if (rowId === targetId) {
+            // Kita buat object baru dengan status yang diubah
+            return { 
+                ...row, 
+                status: newStatus, 
+                Status: newStatus // jaga-jaga kalau backend pake case sensitive
+            }; 
         }
+        // JIKA ID BEDA, KEMBALIKAN DATA ASLI (JANGAN DIUBAH)
         return row;
     });
 
-    // Update Master Data
+    // 3. Update Master Data State & Recalculate Charts
     setHazardData(updatedData);
     calculateSummary(updatedData);
 
-    // Refresh Tabel (Otomatis menghilangkan item jika status jadi Closed)
+    // 4. Refresh Tampilan Modal Detail (Supaya yang Closed langsung hilang dari list aktif)
     refreshDetailModal(selectedUnitName, updatedData);
 
-    // NOTE: Disini tempat Anda menambahkan kode `await supabase.from(...).update(...)`
+    // 5. (Opsional) Update ke Database Supabase
+    /*
+    const { error } = await supabase
+        .from('hazards')
+        .update({ status: newStatus })
+        .eq('no. pelaporan', targetId);
     
+    if (error) console.error("Gagal update DB:", error);
+    */
+
     alert(`Status berhasil diubah menjadi: ${newStatus}`);
   };
 
@@ -224,7 +270,7 @@ export default function Dashboard() {
 
       </div>
 
-      {/* --- MODAL 1: IMPORT FILE (ADMIN ONLY) --- */}
+      {/* --- MODALS --- */}
       {userRole === 'admin' && isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
             <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
@@ -235,7 +281,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* --- MODAL 2: TABEL LIST HAZARD --- */}
       <DetailGrafik 
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
@@ -244,7 +289,6 @@ export default function Dashboard() {
         onRowClick={handleRowClick} 
       />
 
-      {/* --- MODAL 3: DETAIL HAZARD & EDIT STATUS (NEW) --- */}
       <DetailHazard 
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
