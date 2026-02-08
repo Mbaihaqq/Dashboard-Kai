@@ -60,20 +60,44 @@ export default function Dashboard() {
     }
   }, [router]);
 
-  // --- 1. NORMALISASI DATA ---
+  // --- 1. NORMALISASI DATA (Mapping Excel -> Database Lengkap) ---
   const normalizeData = (rawItem) => {
     return {
-        // ID Unik 
-        no_pelaporan: rawItem['no_pelaporan'] || rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['report_no'] || `UNKNOWN-${Math.random()}`,
+        // --- 1. Identitas Laporan ---
+        no_pelaporan: rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['no_pelaporan'] || `UNKNOWN-${Math.random()}`,
         
-        // Data Lain
-        tanggal_hazard: rawItem['tanggal_hazard'] || rawItem['Tanggal Hazard'] || rawItem['Tanggal'] || null,
-        unit: rawItem['unit'] || rawItem['Unit'] || 'Unknown',
-        uraian: rawItem['uraian'] || rawItem['Uraian'] || rawItem['Uraian Hazard'] || '-',
-        status: rawItem['status'] || rawItem['Status'] || 'Open',
-        pic: rawItem['pic'] || rawItem['PIC'] || '-',
-        lokasi: rawItem['lokasi'] || rawItem['Lokasi'] || '-',
-        bukti_pelaporan: rawItem['bukti_pelaporan'] || rawItem['Bukti Pelaporan'] || rawItem['Link Bukti'] || null
+        // --- 2. Tanggal (Ambil apa adanya dari Excel) ---
+        tanggal_input_hazard: rawItem['Tanggal Input Hazard'] || '-',
+        tanggal_hazard: rawItem['Tanggal Hazard'] || rawItem['Tanggal'] || null,
+        tanggal_closed: rawItem['Tanggal Closed'] || '-',
+        
+        // --- 3. Lokasi & Unit ---
+        unit: rawItem['Unit'] || rawItem['unit'] || 'Unknown',
+        kelompok: rawItem['Kelompok'] || '-',
+        perusahaan: rawItem['Perusahaan'] || '-',
+        wilayah: rawItem['Wilayah'] || '-',
+        lokasi: rawItem['Lokasi'] || rawItem['lokasi'] || '-',
+        
+        // --- 4. Detail Masalah ---
+        uraian: rawItem['Uraian'] || rawItem['Uraian Hazard'] || rawItem['uraian'] || '-',
+        status: rawItem['Status'] || rawItem['status'] || 'Open',
+        pic: rawItem['PIC'] || rawItem['pic'] || '-',
+        tembusan: rawItem['Tembusan'] || '-',
+        
+        // --- 5. Risiko & Analisis ---
+        kategori_resiko: rawItem['Kategori Resiko'] || '-',
+        risiko: rawItem['Risiko'] || '-',
+        kemungkinan: rawItem['Kemungkinan'] ? String(rawItem['Kemungkinan']) : '-',
+        akibat: rawItem['Akibat'] ? String(rawItem['Akibat']) : '-',
+        response_time: rawItem['Response Time'] ? String(rawItem['Response Time']) : '-',
+        
+        // --- 6. Bukti ---
+        bukti_pelaporan: rawItem['Bukti Pelaporan'] || rawItem['Link Bukti'] || rawItem['bukti_pelaporan'] || null,
+        bukti_tindaklanjut: rawItem['Bukti Tindaklanjut'] || null,
+        
+        // --- 7. Periode ---
+        bulan: rawItem['Bulan'] || '-',
+        tahun: rawItem['Tahun'] ? String(rawItem['Tahun']) : '-'
     };
   };
 
@@ -87,7 +111,9 @@ export default function Dashboard() {
         if (data && data.length > 0) { allData = [...allData, ...data]; from += 1000; to += 1000; } else { hasMore = false; }
       }
       
-      const cleanData = allData.map(normalizeData);
+      // Karena data dari DB sudah ternormalisasi (kolom snake_case), kita pakai langsung
+      // Tapi untuk amannya, kita normalize lagi agar key object konsisten
+      const cleanData = allData.map(normalizeData); 
       setHazardData(cleanData);
       calculateSummary(cleanData);
     } catch (error) { console.error("Error dashboard:", error.message); }
