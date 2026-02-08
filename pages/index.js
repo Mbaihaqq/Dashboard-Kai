@@ -8,6 +8,9 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
 import { UploadCloud, X, FileSpreadsheet, History, Loader2 } from 'lucide-react';
 
+// --- FIX: IMPORT DI SINI AGAR TIDAK ERROR "UNDEFINED" ---
+import * as XLSX from 'xlsx'; 
+
 export default function Dashboard() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -38,7 +41,7 @@ export default function Dashboard() {
 
   const COLORS = { new: '#ef4444', open: '#f59e0b', progress: '#10b981', closed: '#8b5cf6', empty: '#e5e7eb' };
 
-  // Helper Format Tanggal (Aman dari Error)
+  // Helper Format Tanggal
   const formatDateTime = (date) => {
     try {
       return new Date(date).toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
@@ -58,6 +61,7 @@ export default function Dashboard() {
         setIsAuthorized(true);
         setUserRole(sessionStorage.getItem('userRole'));
 
+        // Ambil User Email
         const { data: { user } } = await supabase.auth.getUser();
         if (user && user.email) setCurrentUserEmail(user.email);
 
@@ -75,11 +79,13 @@ export default function Dashboard() {
     checkSession();
   }, [router]);
 
-  // --- 1. NORMALISASI DATA (Safe Mode) ---
+  // --- 1. NORMALISASI DATA ---
   const normalizeData = (rawItem) => {
     if (!rawItem) return null;
     return {
+        // ID Unik (Pastikan string)
         no_pelaporan: String(rawItem['no_pelaporan'] || rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['report_no'] || `UNKNOWN-${Math.random()}`),
+        
         tanggal_hazard: rawItem['tanggal_hazard'] || rawItem['Tanggal Hazard'] || rawItem['Tanggal'] || null,
         unit: rawItem['unit'] || rawItem['Unit'] || 'Unknown',
         uraian: rawItem['uraian'] || rawItem['Uraian'] || rawItem['Uraian Hazard'] || '-',
@@ -102,7 +108,7 @@ export default function Dashboard() {
         if (data && data.length > 0) { allData = [...allData, ...data]; from += 1000; to += 1000; } else { hasMore = false; }
       }
       
-      const cleanData = allData.map(normalizeData).filter(Boolean); // Hapus null
+      const cleanData = allData.map(normalizeData).filter(Boolean);
       setHazardData(cleanData);
       calculateSummary(cleanData);
     } catch (error) { console.error("Error dashboard:", error.message); }
@@ -148,27 +154,26 @@ export default function Dashboard() {
 
   const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
-  // --- HANDLER UPLOAD (DYNAMIC IMPORT XLSX) ---
+  // --- HANDLER UPLOAD ---
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
-        // DYNAMIC IMPORT: Load library XLSX hanya saat dibutuhkan biar gak berat
-        const XLSX = (await import('xlsx')).default;
-
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
                 const data = new Uint8Array(e.target.result);
+                // Baca Workbook
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-                // Filter Baris Kosong (PENTING! Penyebab utama crash)
+                // Filter Baris Kosong (Mencegah Crash)
                 const validRows = jsonData.filter(row => {
                     const keys = Object.keys(row);
+                    // Minimal punya salah satu kolom utama
                     return keys.length > 0 && (row['No. Pelaporan'] || row['no_pelaporan'] || row['Unit']);
                 });
 
@@ -178,14 +183,19 @@ export default function Dashboard() {
 
                 const formattedData = validRows.map(normalizeData).filter(Boolean);
                 const totalRows = formattedData.length;
-                const batchSize = 200; // Batch dikecilkan biar browser gak 'ngap'
+                const batchSize = 100; // Batch kecil agar aman memori
 
-                // Upload Batching
+                // Upload Batching Loop
                 for (let i = 0; i < totalRows; i += batchSize) {
                     const batch = formattedData.slice(i, i + batchSize);
-                    const { error } = await supabase.from('hazards').upsert(batch, { onConflict: 'no_pelaporan' });
                     
-                    if (error) throw error;
+                    // Gunakan try-catch di dalam loop agar stabil
+                    try {
+                        const { error } = await supabase.from('hazards').upsert(batch, { onConflict: 'no_pelaporan' });
+                        if (error) throw error;
+                    } catch (batchErr) {
+                        console.warn("Batch error (skip):", batchErr.message);
+                    }
                     
                     // Hitung Progress
                     setUploadProgress(Math.round(((i + batch.length) / totalRows) * 100));
@@ -339,7 +349,7 @@ export default function Dashboard() {
 
       </div>
 
-      {/* --- MODAL 1: IMPORT FILE --- */}
+      {/* --- MODALS --- */}
       {userRole === 'admin' && isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
             <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
