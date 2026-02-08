@@ -14,6 +14,9 @@ export default function Layout({ children }) {
 
   const router = useRouter();
 
+  // FIX 1: Deteksi halaman History (Huruf Besar H sesuai nama file Anda)
+  const isHistoryPage = router.pathname === '/History';
+
   useEffect(() => {
     setRole(sessionStorage.getItem('userRole') || 'user');
   }, []);
@@ -24,7 +27,6 @@ export default function Layout({ children }) {
     router.push('/loginPage/login');
   };
 
-  // Fungsi ganti halaman untuk User
   const handlePageChange = (pageName, path) => {
     setCurrentPage(pageName);
     setIsDropdownOpen(false);
@@ -44,17 +46,22 @@ export default function Layout({ children }) {
             <img src="/logo-daop4.png" alt="Logo Daop 4" className="h-12 w-auto object-contain" />
           </div>
 
-          {/* 2. TENGAH: Search Bar */}
-          <div className="hidden md:flex flex-1 max-w-2xl mx-8 relative">
-             <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#F26522]">
-                <Search size={20} />
-             </div>
-             <input 
-                type="text" 
-                placeholder="Search here..." 
-                className="w-full bg-[#F5F6F8] text-gray-600 rounded-lg py-3 pl-12 pr-4 outline-none focus:bg-white focus:ring-2 focus:ring-[#F26522]/20 transition-all text-sm"
-             />
-          </div>
+          {/* 2. TENGAH: Search Bar (FIX 2: Hilang kalau di halaman History) */}
+          {!isHistoryPage ? (
+            <div className="hidden md:flex flex-1 max-w-2xl mx-8 relative">
+               <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#F26522]">
+                  <Search size={20} />
+               </div>
+               <input 
+                  type="text" 
+                  placeholder="Search here..." 
+                  className="w-full bg-[#F5F6F8] text-gray-600 rounded-lg py-3 pl-12 pr-4 outline-none focus:bg-white focus:ring-2 focus:ring-[#F26522]/20 transition-all text-sm"
+               />
+            </div>
+          ) : (
+            // Spacer kosong agar layout user di kanan tidak geser ke tengah
+            <div className="hidden md:flex flex-1 max-w-2xl mx-8"></div>
+          )}
 
           {/* 3. TENGAH-KANAN: DROPDOWN MENU (HANYA UNTUK USER) */}
           {role === 'user' && (
@@ -70,7 +77,6 @@ export default function Layout({ children }) {
                     <ChevronDown size={16} className={`text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* Isi Dropdown */}
                 {isDropdownOpen && (
                     <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                         <div className="py-1">
@@ -103,7 +109,6 @@ export default function Layout({ children }) {
                   </button>
                 </Link>
              </div>
-             {/* Hamburger Mobile */}
              <div className="md:hidden">
                <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-[#005DAA] p-2">
                  {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
@@ -114,7 +119,6 @@ export default function Layout({ children }) {
       </nav>
 
       {/* --- BARIS 2: NAVIGATION BAR (HANYA UNTUK ADMIN) --- */}
-      {/* UPDATE DI SINI: Link diarahkan ke file yang benar */}
       {role === 'admin' && (
         <div className="bg-[#E85D18] shadow-md relative z-40 hidden md:block">
             <div className="w-full px-8 flex items-center gap-1 h-12">
@@ -135,15 +139,15 @@ export default function Layout({ children }) {
                     </div>
                 </Link>
                 
-                {/* MENU 3: HISTORY (PERBAIKAN LINK) */}
+                {/* MENU 3: HISTORY (FIX 3: Link ke /History Huruf Besar) */}
                 <Link href="/History">
-                    <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer flex items-center gap-2 ${router.pathname === '/history' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
+                    <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer flex items-center gap-2 ${router.pathname === '/History' ? 'bg-[#1F2937] text-white shadow-lg' : 'text-white hover:bg-white/10'}`}>
                         <History size={16} />
                         Histori Penginputan Data
                     </div>
                 </Link>
                 
-                {/* MENU 4: APPROVAL (OPSIONAL) */}
+                {/* MENU 4: APPROVAL */}
                 <Link href="/admin/approval">
                     <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer flex items-center gap-2 ${router.pathname === '/admin/approval' ? 'bg-[#1F2937] text-white' : 'text-white hover:bg-white/10'}`}>
                         <Users size={16} />

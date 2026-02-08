@@ -3,8 +3,8 @@ import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { supabase } from '../lib/supabaseClient';
 import { 
-  ArrowLeft, Search, FileSpreadsheet, Calendar, 
-  User, Download, Clock 
+  ArrowLeft, Search, FileSpreadsheet,
+  User, Clock 
 } from 'lucide-react';
 
 export default function HistoryPage() {
@@ -64,7 +64,7 @@ export default function HistoryPage() {
                 </button>
                 <div>
                     <h1 className="text-xl font-bold text-gray-800 tracking-tight">Riwayat Penginputan</h1>
-                    <p className="text-xs text-gray-500"></p>
+                    <p className="text-xs text-gray-500">Log aktivitas impor data hazard.</p>
                 </div>
             </div>
 
@@ -93,7 +93,7 @@ export default function HistoryPage() {
                                 Waktu Upload
                             </th>
                             <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                Username
+                                Uploaded By
                             </th>
                             <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                                 Nama File
@@ -129,7 +129,7 @@ export default function HistoryPage() {
                                             </div>
                                         </td>
 
-                                        {/* Admin */}
+                                        {/* Admin (Uploaded By) */}
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center">
                                                 <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 border border-gray-200">
@@ -172,14 +172,11 @@ export default function HistoryPage() {
                 </table>
             </div>
             
-            {/* Footer Summary (Opsional) */}
+            {/* Footer Summary */}
             <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex items-center justify-between">
                 <span className="text-xs text-gray-500">
                     Menampilkan <span className="font-bold">{filteredData.length}</span> data
                 </span>
-                <div className="flex gap-1">
-                    {/* Placeholder pagination simple jika diperlukan nanti */}
-                </div>
             </div>
         </div>
 
