@@ -273,13 +273,6 @@ export default function Dashboard() {
             {userRole === 'admin' && (
                 <div className="flex gap-3">
                     <button 
-                        onClick={() => router.push('/History')} 
-                        className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
-                    >
-                        <History size={16} /> Riwayat Upload
-                    </button>
-
-                    <button 
                         onClick={() => setIsModalOpen(true)} 
                         className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
                     >
