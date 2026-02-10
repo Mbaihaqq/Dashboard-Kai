@@ -4,32 +4,37 @@ import { X, Save, AlertCircle, Calendar, User, MapPin, Eye, FileText, ExternalLi
 export default function DetailHazard({ isOpen, onClose, data, onSave }) {
   const [status, setStatus] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [displayImg, setDisplayImg] = useState(null); // State baru untuk URL Gambar yang sudah diproses
+  const [displayImg, setDisplayImg] = useState(null);
 
   useEffect(() => {
     if (data) {
-      // Prioritaskan format lowercase (dari DB), fallback ke format Excel
       setStatus(data.status || data['Status'] || 'Open');
 
-      // --- LOGIKA PERBAIKAN GAMBAR ---
+      // --- LOGIKA PERBAIKAN LINK GAMBAR (FIXED) ---
       const rawUrl = data.bukti_pelaporan || data['Bukti Pelaporan'] || data['Link Bukti'];
+      
       if (rawUrl) {
-        if (rawUrl.includes('drive.google.com')) {
-          // Ambil ID dari link Google Drive dan ubah jadi Direct Link
-          const idMatch = rawUrl.match(/\/d\/(.+?)(\/|$|\?)/);
-          if (idMatch && idMatch[1]) {
-            // Gunakan domain lh3.googleusercontent.com agar bisa di-embed langsung
-            setDisplayImg(`https://lh3.googleusercontent.com/d/${idMatch[1]}`);
+        // Cek apakah link Google Drive
+        if (rawUrl.includes('drive.google.com') || rawUrl.includes('docs.google.com')) {
+          // Regex untuk mengambil ID File (String acak panjang sekitar 33 karakter)
+          const idMatch = rawUrl.match(/[-\w]{25,}/);
+          
+          if (idMatch) {
+            // Gunakan format link lh3.googleusercontent.com/d/ID agar bisa tampil langsung
+            // PENTING: File di Google Drive harus disetting "Anyone with the link" (Siapa saja yang memiliki link)
+            setDisplayImg(`https://lh3.googleusercontent.com/d/${idMatch[0]}`);
           } else {
+            // Kalau ID tidak ketemu, pakai link asli (mungkin akan error kalau bukan direct link)
             setDisplayImg(rawUrl);
           }
         } else {
+          // Kalau bukan Google Drive (misal link gambar biasa / hosting lain)
           setDisplayImg(rawUrl);
         }
       } else {
         setDisplayImg(null);
       }
-      // -------------------------------
+      // ---------------------------------------------
     }
   }, [data]);
 
@@ -44,12 +49,10 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
     }, 800);
   };
 
-  // Helper untuk membaca field (bisa dari format DB lowercase atau Excel Uppercase)
   const getField = (keyLower, keyExcel) => {
     return data[keyLower] || data[keyExcel] || '-';
   };
 
-  // Ambil URL Bukti ASLI (untuk keperluan link 'Buka Ukuran Penuh' & text di bawah gambar)
   const originalUrl = data.bukti_pelaporan || data['Bukti Pelaporan'] || data['Link Bukti'];
 
   return (
@@ -123,17 +126,17 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-2">Bukti Pelaporan</label>
                 {displayImg ? (
                     <div className="space-y-3">
-                        {/* Container Gambar */}
                         <div className="relative group w-full h-64 bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
                             <img 
-                                src={displayImg}   // <--- PAKE VARIABLE YANG SUDAH DIPROSES
+                                src={displayImg}
                                 alt="Bukti Hazard" 
                                 className="object-contain w-full h-full"
                                 referrerPolicy="no-referrer"
                                 crossOrigin="anonymous"
                                 onError={(e) => {
                                     e.target.onerror = null; 
-                                    e.target.src = "https://placehold.co/600x400?text=Gambar+Rusak+atau+Tidak+Ada";
+                                    // Fallback ke placeholder jika gagal load (misal karena permission issue)
+                                    e.target.src = "https://placehold.co/600x400?text=Akses+Gambar+Ditolak+Google";
                                 }} 
                             />
                             {/* Overlay Button */}
@@ -150,6 +153,9 @@ export default function DetailHazard({ isOpen, onClose, data, onSave }) {
                         </div>
                         <p className="text-[10px] text-gray-400 truncate text-center mt-1 select-all cursor-text" title={originalUrl}>
                             {originalUrl}
+                        </p>
+                        <p className="text-[10px] text-red-400 text-center italic">
+                            *Jika gambar loading terus/error, pastikan akses file di Google Drive sudah "Anyone with the link".
                         </p>
                     </div>
                 ) : (
