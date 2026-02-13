@@ -4,7 +4,8 @@ import Layout from '../components/Layout';
 import { supabase } from '../lib/supabaseClient';
 import { 
   Settings, TrainFront, RadioTower, 
-  Building2, Wrench, Users, Search, BarChart3 
+  Building2, Wrench, Users, Search, BarChart3, 
+  ArrowUpDown, Filter 
 } from 'lucide-react';
 
 export default function TLAnalytics() {
@@ -13,7 +14,10 @@ export default function TLAnalytics() {
   const [analyticsData, setAnalyticsData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [lastUpdate, setLastUpdate] = useState('-');
-  const [totalRowsLoaded, setTotalRowsLoaded] = useState(0); // Indikator jumlah data
+  const [totalRowsLoaded, setTotalRowsLoaded] = useState(0);
+  
+  // STATE BARU: Untuk Mengatur Arah Sortir (desc = Tinggi ke Rendah, asc = Rendah ke Tinggi)
+  const [sortOrder, setSortOrder] = useState('desc'); 
 
   useEffect(() => {
     const checkSession = async () => {
@@ -23,7 +27,6 @@ export default function TLAnalytics() {
             return;
         }
         
-        // Ambil Last Update
         const savedDate = localStorage.getItem('last_update_fixed');
         if (savedDate) setLastUpdate(savedDate);
 
@@ -32,7 +35,6 @@ export default function TLAnalytics() {
     checkSession();
   }, []);
 
-  // --- 1. FETCH SEMUA DATA (LOOPING SAMPAI HABIS) ---
   const fetchAnalytics = async () => {
     try {
         setLoading(true);
@@ -41,7 +43,6 @@ export default function TLAnalytics() {
         let to = 999;
         let hasMore = true;
 
-        // Loop request per 1000 data sampai tidak ada sisa
         while (hasMore) {
             const { data, error } = await supabase
                 .from('hazards')
@@ -55,11 +56,11 @@ export default function TLAnalytics() {
                 from += 1000;
                 to += 1000;
             } else {
-                hasMore = false; // Berhenti kalau data habis
+                hasMore = false;
             }
         }
 
-        setTotalRowsLoaded(allData.length); // Harusnya 7713 sesuai excel
+        setTotalRowsLoaded(allData.length);
         processData(allData);
 
     } catch (error) {
@@ -70,7 +71,6 @@ export default function TLAnalytics() {
   };
 
   const processData = (data) => {
-    // 2. Kelompokkan data per Unit
     const grouped = {};
     
     data.forEach(item => {
@@ -86,33 +86,48 @@ export default function TLAnalytics() {
         }
     });
 
-    // 3. Hitung Persentase
     const result = Object.keys(grouped).map(name => {
         const { total, closed } = grouped[name];
-        const percentage = total === 0 ? 0 : Math.round((closed / total) * 100);
+        
+        // --- PERBAIKAN MATEMATIKA ---
+        // Rumus: (closed / total) * 100
+        // Math.min(100, ...) memastikan tidak akan lebih dari 100% walaupun data aneh (closed > total)
+        let rawPercentage = total === 0 ? 0 : Math.round((closed / total) * 100);
+        const percentage = Math.min(100, rawPercentage);
         
         return { name, percentage, total, closed };
     });
 
-    // 4. SORTING: Dari yang completion Paling BESAR ke KECIL
-    const sortedResult = result.sort((a, b) => b.percentage - a.percentage);
-
-    setAnalyticsData(sortedResult);
+    setAnalyticsData(result);
   };
 
-  // --- FILTER SEARCH ---
-  const filteredData = analyticsData.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // --- LOGIKA FILTER & SORTING ---
+  const getProcessedData = () => {
+    // 1. Filter dulu berdasarkan Search
+    let filtered = analyticsData.filter(item => 
+        item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-  // --- 5. LOGIKA WARNA BARU ---
+    // 2. Lalu Sortir berdasarkan tombol yang dipilih user
+    return filtered.sort((a, b) => {
+        if (sortOrder === 'desc') {
+            return b.percentage - a.percentage; // Tertinggi ke Terendah
+        } else {
+            return a.percentage - b.percentage; // Terendah ke Tertinggi
+        }
+    });
+  };
+
+  const finalData = getProcessedData();
+
+  // --- LOGIKA WARNA (Sesuai Request) ---
   // > 80% = Hijau
   // 50% - 80% = Kuning
   // < 50% = Merah
   const getColor = (pct) => {
-    if (pct > 80) return { bar: 'bg-[#22C55E]', bg: 'bg-[#DCFCE7]', text: 'text-[#15803d]' }; // Hijau
-    if (pct >= 50) return { bar: 'bg-[#EAB308]', bg: 'bg-[#FEF9C3]', text: 'text-[#a16207]' }; // Kuning
-    return { bar: 'bg-[#EF4444]', bg: 'bg-[#FEE2E2]', text: 'text-[#b91c1c]' }; // Merah
+    if (pct > 80) return { bar: 'bg-[#22C55E]', bg: 'bg-[#DCFCE7]', text: 'text-[#15803d]' };
+    if (pct >= 50) return { bar: 'bg-[#EAB308]', bg: 'bg-[#FEF9C3]', text: 'text-[#a16207]' }; 
+    return { bar: 'bg-[#EF4444]', bg: 'bg-[#FEE2E2]', text: 'text-[#b91c1c]' }; 
   };
 
   const getIcon = (unitName) => {
@@ -150,32 +165,48 @@ export default function TLAnalytics() {
             </div>
         </div>
 
-        {/* PROGRESS LIST */}
+        {/* PROGRESS LIST CARD */}
         <div className="bg-white rounded-[1.5rem] shadow-sm border border-gray-100 p-8 min-h-[500px]">
-            <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-                <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
-                    Progress Penyelesaian per Unit (Sorted Highest %)
+            
+            {/* CARD HEADER & SORT BUTTON */}
+            <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-gray-100 pb-4 gap-4">
+                <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                    <BarChart3 size={18} />
+                    Progress Penyelesaian per Unit
                 </h2>
-                <span className="text-xs text-gray-400 font-medium">
-                    Menampilkan {filteredData.length} Unit
-                </span>
+                
+                <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                    <span className="text-xs text-gray-400 font-medium">
+                        Menampilkan {finalData.length} Unit
+                    </span>
+                    
+                    {/* TOMBOL SORTIR BARU */}
+                    <button 
+                        onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition-all active:scale-95"
+                    >
+                        <ArrowUpDown size={14} />
+                        Urutkan: {sortOrder === 'desc' ? 'Tertinggi ke Terendah' : 'Terendah ke Tertinggi'}
+                    </button>
+                </div>
             </div>
 
+            {/* LIST CONTENT */}
             {loading ? (
                  <div className="flex flex-col items-center justify-center h-64 text-gray-400">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#005DAA] mb-2"></div>
                     Memuat {totalRowsLoaded > 0 ? totalRowsLoaded : ''} data...
                 </div>
-            ) : filteredData.length > 0 ? (
-                <div className="space-y-8">
-                    {filteredData.map((item, idx) => {
+            ) : finalData.length > 0 ? (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {finalData.map((item, idx) => {
                         const colorStyle = getColor(item.percentage);
                         return (
                             <div key={idx} className="group">
                                 {/* Header Item */}
                                 <div className="flex justify-between items-end mb-2">
                                     <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-lg ${colorStyle.bg} ${colorStyle.text}`}>
+                                        <div className={`p-2 rounded-lg ${colorStyle.bg} ${colorStyle.text} transition-colors duration-300`}>
                                             {getIcon(item.name)}
                                         </div>
                                         <div>
@@ -188,7 +219,7 @@ export default function TLAnalytics() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <span className={`text-2xl font-black ${colorStyle.text}`}>
+                                        <span className={`text-2xl font-black ${colorStyle.text} transition-colors duration-300`}>
                                             {item.percentage}%
                                         </span>
                                     </div>
