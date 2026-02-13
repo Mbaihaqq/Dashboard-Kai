@@ -1,25 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
-// Import Komponen
 import DetailGrafik from '../components/DetailGrafik'; 
 import DetailHazard from '../components/DetailHazard'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
-import { UploadCloud, X, FileSpreadsheet, History, Loader2 } from 'lucide-react';
-
-// --- FIX: IMPORT DI SINI AGAR TIDAK ERROR "UNDEFINED" ---
+import { UploadCloud, History, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx'; 
 
 export default function Dashboard() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
   
+  // --- STATE USER & SEARCH ---
+  const [userRole, setUserRole] = useState(null); 
+  const [currentUserEmail, setCurrentUserEmail] = useState('');
+  const [searchTerm, setSearchTerm] = useState(''); // <--- STATE PENCARIAN
+
   // --- STATE DATA ---
   const [unitsData, setUnitsData] = useState([]);
   const [hazardData, setHazardData] = useState([]); 
-  const [userRole, setUserRole] = useState(null); 
-  const [currentUserEmail, setCurrentUserEmail] = useState('');
 
   // --- STATE MODALS ---
   const [isModalOpen, setIsModalOpen] = useState(false); 
@@ -41,13 +41,10 @@ export default function Dashboard() {
 
   const COLORS = { new: '#ef4444', open: '#f59e0b', progress: '#10b981', closed: '#8b5cf6', empty: '#e5e7eb' };
 
-  // Helper Format Tanggal
   const formatDateTime = (date) => {
     try {
       return new Date(date).toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
-    } catch (e) {
-      return '-';
-    }
+    } catch (e) { return '-'; }
   };
 
   useEffect(() => {
@@ -61,7 +58,6 @@ export default function Dashboard() {
         setIsAuthorized(true);
         setUserRole(sessionStorage.getItem('userRole'));
 
-        // Ambil User Email
         const { data: { user } } = await supabase.auth.getUser();
         if (user && user.email) setCurrentUserEmail(user.email);
 
@@ -79,13 +75,32 @@ export default function Dashboard() {
     checkSession();
   }, [router]);
 
-  // --- 1. NORMALISASI DATA ---
+  // --- USE EFFECT BARU: FILTERING OTOMATIS SAAT KETIK ---
+  useEffect(() => {
+    // Jika data kosong, skip
+    if (hazardData.length === 0) return;
+
+    // Filter Logic
+    const lowerTerm = searchTerm.toLowerCase();
+    const filtered = hazardData.filter(item => {
+        return (
+            (item.uraian && item.uraian.toLowerCase().includes(lowerTerm)) ||
+            (item.unit && item.unit.toLowerCase().includes(lowerTerm)) ||
+            (item.lokasi && item.lokasi.toLowerCase().includes(lowerTerm)) ||
+            (item.no_pelaporan && item.no_pelaporan.toLowerCase().includes(lowerTerm)) ||
+            (item.pic && item.pic.toLowerCase().includes(lowerTerm))
+        );
+    });
+
+    // Hitung ulang grafik berdasarkan data yang sudah difilter
+    calculateSummary(filtered);
+
+  }, [searchTerm, hazardData]); // Jalan setiap searchTerm berubah atau data baru masuk
+
   const normalizeData = (rawItem) => {
     if (!rawItem) return null;
     return {
-        // ID Unik (Pastikan string)
         no_pelaporan: String(rawItem['no_pelaporan'] || rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['report_no'] || `UNKNOWN-${Math.random()}`),
-        
         tanggal_hazard: rawItem['tanggal_hazard'] || rawItem['Tanggal Hazard'] || rawItem['Tanggal'] || null,
         unit: rawItem['unit'] || rawItem['Unit'] || 'Unknown',
         uraian: rawItem['uraian'] || rawItem['Uraian'] || rawItem['Uraian Hazard'] || '-',
@@ -110,13 +125,20 @@ export default function Dashboard() {
       
       const cleanData = allData.map(normalizeData).filter(Boolean);
       setHazardData(cleanData);
-      calculateSummary(cleanData);
+      // calculateSummary dipanggil otomatis oleh useEffect di atas
     } catch (error) { console.error("Error dashboard:", error.message); }
   };
 
   const calculateSummary = (data) => {
-      if (!data || data.length === 0) return;
+      // Logic Summary tetap sama, tapi sekarang menerima 'data' yang bisa berupa hasil filter
       const grandTotal = data.length;
+
+      // Reset jika hasil filter 0 agar grafik kosong rapi
+      if (grandTotal === 0) {
+          setSummary({ open: 0, pctOpen: 0, progress: 0, pctProgress: 0, closed: 0, pctClosed: 0, total: 0 });
+          setUnitsData([]);
+          return;
+      }
 
       const tOpen = data.filter(d => d.status === 'Open').length;
       const tProg = data.filter(d => d.status === 'Work In Progress').length;
@@ -152,56 +174,45 @@ export default function Dashboard() {
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
   };
 
+  // ... (Sisa handler upload, unit click, dll SAMA PERSIS tidak perlu diubah) ...
   const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
-  // --- HANDLER UPLOAD ---
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
+        const XLSX = (await import('xlsx')); 
+
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
                 const data = new Uint8Array(e.target.result);
-                // Baca Workbook
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-                // Filter Baris Kosong (Mencegah Crash)
                 const validRows = jsonData.filter(row => {
                     const keys = Object.keys(row);
-                    // Minimal punya salah satu kolom utama
                     return keys.length > 0 && (row['No. Pelaporan'] || row['no_pelaporan'] || row['Unit']);
                 });
 
-                if (validRows.length === 0) {
-                    throw new Error("File Excel kosong atau header tidak sesuai!");
-                }
+                if (validRows.length === 0) throw new Error("File Excel kosong atau header tidak sesuai!");
 
                 const formattedData = validRows.map(normalizeData).filter(Boolean);
                 const totalRows = formattedData.length;
-                const batchSize = 100; // Batch kecil agar aman memori
+                const batchSize = 100;
 
-                // Upload Batching Loop
                 for (let i = 0; i < totalRows; i += batchSize) {
                     const batch = formattedData.slice(i, i + batchSize);
-                    
-                    // Gunakan try-catch di dalam loop agar stabil
                     try {
                         const { error } = await supabase.from('hazards').upsert(batch, { onConflict: 'no_pelaporan' });
                         if (error) throw error;
-                    } catch (batchErr) {
-                        console.warn("Batch error (skip):", batchErr.message);
-                    }
-                    
-                    // Hitung Progress
+                    } catch (batchErr) { console.warn("Batch error:", batchErr.message); }
                     setUploadProgress(Math.round(((i + batch.length) / totalRows) * 100));
                 }
 
-                // Catat History
                 const finalUploaderName = currentUserEmail && currentUserEmail !== '' ? currentUserEmail : (userRole || 'Admin System');
                 await supabase.from('upload_history').insert({
                     admin_name: finalUploaderName, 
@@ -209,7 +220,6 @@ export default function Dashboard() {
                     total_rows: totalRows
                 });
 
-                // Selesai
                 const now = formatDateTime(new Date());
                 setLastUpdate(now); 
                 localStorage.setItem('last_update_fixed', now); 
@@ -275,7 +285,7 @@ export default function Dashboard() {
         });
 
         setHazardData(updatedData);
-        calculateSummary(updatedData);
+        // calculateSummary akan dipanggil otomatis oleh useEffect
         refreshDetailModal(selectedUnitName, updatedData); 
         alert("Status berhasil diperbarui!");
     } catch (error) { alert("Gagal update status: " + error.message); }
@@ -284,7 +294,8 @@ export default function Dashboard() {
   if (!isAuthorized) return <div className="h-screen bg-[#F8F9FA]"></div>;
 
   return (
-    <Layout>
+    // PASSING FUNCTION SEARCH KE LAYOUT
+    <Layout onSearch={setSearchTerm}>
       <div className="w-full px-6 py-4">
         
         {/* HEADER */}
@@ -293,17 +304,17 @@ export default function Dashboard() {
             
             {userRole === 'admin' && (
                 <div className="flex gap-3">
-                    <button 
-                        onClick={() => setIsModalOpen(true)} 
-                        className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
-                    >
+                    <button onClick={() => router.push('/History')} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
+                        <History size={16} /> Riwayat Upload
+                    </button>
+                    <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
                         <UploadCloud size={16} /> Import File
                     </button>
                 </div>
             )}
         </div>
 
-        {/* SUMMARY */}
+        {/* SUMMARY (DATA SUDAH TER-FILTER OTOMATIS) */}
         <div className="w-full max-w-[1050px] mr-auto bg-white rounded-[1.5rem] p-8 shadow-sm mb-12 border border-gray-100">
             <div className="flex justify-between items-start mb-8 border-b border-gray-50 pb-4">
                 <div>
@@ -313,7 +324,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right">
                     <span className="text-6xl font-black text-gray-800 tracking-tight">{summary.total}</span>
-                    <p className="text-sm text-gray-500 font-medium mt-1">Total Hazard</p>
+                    <p className="text-sm text-gray-500 font-medium mt-1">Total Hazard {searchTerm && '(Filtered)'}</p>
                 </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -326,25 +337,34 @@ export default function Dashboard() {
 
         {/* UNIT ANALYTICS */}
         <div className="w-full">
-            <h3 className="text-xl font-bold text-gray-700 mb-6 border-l-4 border-[#005DAA] pl-3">Detail Unit ({unitsData.length})</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-12">
-                {unitsData.map((unit, idx) => (
-                <div key={idx} onClick={() => handleUnitClick(unit.name)} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300 cursor-pointer group relative hover:-translate-y-1">
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><div className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow-md">Click Details</div></div>
-                    <h4 className="text-base font-bold text-gray-700 mb-4 h-6 truncate uppercase">{unit.name}</h4>
-                    <div className="relative w-full h-40 flex justify-center items-end overflow-hidden mb-6">
-                        <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={unit.chartData} cx="50%" cy="100%" startAngle={180} endAngle={0} innerRadius={70} outerRadius={100} paddingAngle={2} dataKey="value" stroke="none">{unit.chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie></PieChart></ResponsiveContainer>
-                        <div className="absolute bottom-0 mb-2 flex flex-col items-center pointer-events-none"><span className="text-3xl font-black text-[#005DAA] leading-none">{unit.completion}%</span><span className="text-xs text-gray-400 font-bold mt-1">TL%</span></div>
+            <h3 className="text-xl font-bold text-gray-700 mb-6 border-l-4 border-[#005DAA] pl-3">
+                Detail Unit ({unitsData.length})
+            </h3>
+            
+            {unitsData.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-12">
+                    {unitsData.map((unit, idx) => (
+                    <div key={idx} onClick={() => handleUnitClick(unit.name)} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300 cursor-pointer group relative hover:-translate-y-1">
+                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><div className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow-md">Click Details</div></div>
+                        <h4 className="text-base font-bold text-gray-700 mb-4 h-6 truncate uppercase">{unit.name}</h4>
+                        <div className="relative w-full h-40 flex justify-center items-end overflow-hidden mb-6">
+                            <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={unit.chartData} cx="50%" cy="100%" startAngle={180} endAngle={0} innerRadius={70} outerRadius={100} paddingAngle={2} dataKey="value" stroke="none">{unit.chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie></PieChart></ResponsiveContainer>
+                            <div className="absolute bottom-0 mb-2 flex flex-col items-center pointer-events-none"><span className="text-3xl font-black text-[#005DAA] leading-none">{unit.completion}%</span><span className="text-xs text-gray-400 font-bold mt-1">TL%</span></div>
+                        </div>
+                        <div className="flex justify-between items-end px-2 gap-2 pointer-events-none">
+                            <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#f59e0b] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Open</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[0].value}</span></div></div>
+                            <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#10b981] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Prog</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[1].value}</span></div></div>
+                            <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#8b5cf6] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Close</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[2].value}</span></div></div>
+                            <div className="flex gap-2 items-center border-l pl-4 border-gray-100"><div className="w-1.5 h-8 bg-gray-400 rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Total</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.total}</span></div></div>
+                        </div>
                     </div>
-                    <div className="flex justify-between items-end px-2 gap-2 pointer-events-none">
-                        <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#f59e0b] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Open</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[0].value}</span></div></div>
-                        <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#10b981] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Prog</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[1].value}</span></div></div>
-                        <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#8b5cf6] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Close</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[2].value}</span></div></div>
-                        <div className="flex gap-2 items-center border-l pl-4 border-gray-100"><div className="w-1.5 h-8 bg-gray-400 rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Total</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.total}</span></div></div>
-                    </div>
+                    ))}
                 </div>
-                ))}
-            </div>
+            ) : (
+                <div className="text-center py-20 bg-white rounded-3xl border border-gray-200 text-gray-400">
+                    <p>Tidak ada data yang cocok dengan pencarian "{searchTerm}"</p>
+                </div>
+            )}
         </div>
 
       </div>

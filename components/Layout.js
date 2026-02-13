@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { Search, Menu, X, ChevronDown, LayoutDashboard, BarChart3, History, Users } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
-export default function Layout({ children }) {
+// PERUBAHAN 1: Tambahkan 'onSearch' disini agar bisa kirim data ketikan ke index.js
+export default function Layout({ children, onSearch }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [role, setRole] = useState('user');
   
@@ -14,7 +15,7 @@ export default function Layout({ children }) {
 
   const router = useRouter();
 
-  // FIX 1: Deteksi halaman History (Huruf Besar H sesuai nama file Anda)
+  // FIX: Deteksi halaman History (Huruf Besar H sesuai nama file)
   const isHistoryPage = router.pathname === '/History';
 
   useEffect(() => {
@@ -46,7 +47,7 @@ export default function Layout({ children }) {
             <img src="/logo-daop4.png" alt="Logo Daop 4" className="h-12 w-auto object-contain" />
           </div>
 
-          {/* 2. TENGAH: Search Bar (FIX 2: Hilang kalau di halaman History) */}
+          {/* 2. TENGAH: Search Bar (Hilang kalau di halaman History) */}
           {!isHistoryPage ? (
             <div className="hidden md:flex flex-1 max-w-2xl mx-8 relative">
                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#F26522]">
@@ -54,7 +55,9 @@ export default function Layout({ children }) {
                </div>
                <input 
                   type="text" 
-                  placeholder="Search here..." 
+                  placeholder="Cari Uraian, Unit, Lokasi, atau No. Pelaporan..." 
+                  // PERUBAHAN 2: Tambahkan onChange untuk mengirim teks ke Dashboard
+                  onChange={(e) => onSearch && onSearch(e.target.value)}
                   className="w-full bg-[#F5F6F8] text-gray-600 rounded-lg py-3 pl-12 pr-4 outline-none focus:bg-white focus:ring-2 focus:ring-[#F26522]/20 transition-all text-sm"
                />
             </div>
@@ -77,6 +80,7 @@ export default function Layout({ children }) {
                     <ChevronDown size={16} className={`text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
+                {/* Isi Dropdown */}
                 {isDropdownOpen && (
                     <div className="absolute top-full right-0 mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                         <div className="py-1">
@@ -109,6 +113,7 @@ export default function Layout({ children }) {
                   </button>
                 </Link>
              </div>
+             {/* Hamburger Mobile */}
              <div className="md:hidden">
                <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-[#005DAA] p-2">
                  {isMobileMenuOpen ? <X size={28} /> : <Menu size={28} />}
@@ -139,7 +144,7 @@ export default function Layout({ children }) {
                     </div>
                 </Link>
                 
-                {/* MENU 3: HISTORY (FIX 3: Link ke /History Huruf Besar) */}
+                {/* MENU 3: HISTORY (Link ke /History Huruf Besar) */}
                 <Link href="/History">
                     <div className={`px-6 py-1.5 font-semibold text-sm rounded transition-all cursor-pointer flex items-center gap-2 ${router.pathname === '/History' ? 'bg-[#1F2937] text-white shadow-lg' : 'text-white hover:bg-white/10'}`}>
                         <History size={16} />
