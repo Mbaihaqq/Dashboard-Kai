@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
 import { supabase } from '../lib/supabaseClient';
-// IMPORT IKON (Fitur Tambahan)
+// IMPORT IKON
 import { 
   Settings, TrainFront, RadioTower, 
   Building2, Wrench, Users, BarChart3 
@@ -12,9 +12,9 @@ export default function TLAnalytics() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [unitsData, setUnitsData] = useState([]);
-  const [lastUpdate, setLastUpdate] = useState('');
+  const [lastUpdate, setLastUpdate] = useState('-'); // Default strip
   const [sortType, setSortType] = useState('highest');
-  const [totalRows, setTotalRows] = useState(0); // Indikator jumlah data
+  const [totalRows, setTotalRows] = useState(0); 
 
   useEffect(() => {
     const checkSession = async () => {
@@ -25,6 +25,14 @@ export default function TLAnalytics() {
       }
 
       setIsAuthorized(true);
+
+      // --- LOGIKA LAST UPDATE (SINKRON DENGAN DASHBOARD) ---
+      // Ambil tanggal yang disimpan saat upload file di Dashboard utama
+      const savedDate = localStorage.getItem('last_update_fixed');
+      if (savedDate) {
+        setLastUpdate(savedDate);
+      }
+
       fetchHazardStatistics();
     };
 
@@ -41,7 +49,7 @@ export default function TLAnalytics() {
     });
   };
 
-  // === FETCH DATA (SAFE VERSION - FETCH ALL 7713+ DATA) ===
+  // === FETCH DATA ===
   const fetchHazardStatistics = async () => {
     try {
       let allData = [];
@@ -49,11 +57,11 @@ export default function TLAnalytics() {
       let to = 999;
       let hasMore = true;
 
-      // Loop terus sampai data habis
+      // Loop fetch semua data
       while (hasMore) {
         const { data, error } = await supabase
           .from('hazards')
-          .select('unit, status') // Optimalisasi: Cuma ambil kolom yg butuh
+          .select('unit, status')
           .range(from, to);
 
         if (error) throw error;
@@ -67,7 +75,7 @@ export default function TLAnalytics() {
         }
       }
 
-      setTotalRows(allData.length); // Simpan total baris untuk info
+      setTotalRows(allData.length); 
 
       if (!allData.length) return;
 
@@ -110,7 +118,9 @@ export default function TLAnalytics() {
       });
 
       setUnitsData(formattedUnits);
-      setLastUpdate(formatDateTime(new Date()));
+      
+      // HAPUS BARIS INI AGAR TIDAK UPDATE OTOMATIS SAAT REFRESH
+      // setLastUpdate(formatDateTime(new Date())); 
 
     } catch (error) {
       console.error("Error TL Analytics:", error.message);
@@ -147,7 +157,7 @@ export default function TLAnalytics() {
     return { text: "Butuh Tindakan", style: "text-red-600 bg-red-50" };
   };
 
-  // === ICON HELPER (FITUR BARU) ===
+  // === ICON HELPER ===
   const getIcon = (unitName) => {
     const lower = unitName.toLowerCase();
     if (lower.includes('operasi')) return <Settings size={20} />;
@@ -156,7 +166,7 @@ export default function TLAnalytics() {
     if (lower.includes('bangunan')) return <Building2 size={20} />;
     if (lower.includes('sarana')) return <Wrench size={20} />;
     if (lower.includes('penumpang') || lower.includes('fasilitas')) return <Users size={20} />;
-    return <BarChart3 size={20} />; // Icon Default
+    return <BarChart3 size={20} />; 
   };
 
   if (!isAuthorized)
@@ -216,7 +226,6 @@ export default function TLAnalytics() {
 
                   {/* KIRI: NAMA UNIT + ICON */}
                   <div className="flex items-start gap-3">
-                    {/* Icon Container */}
                     <div className="p-2 bg-gray-50 rounded-lg text-gray-500 border border-gray-100">
                         {getIcon(unit.name)}
                     </div>
@@ -255,7 +264,7 @@ export default function TLAnalytics() {
                 </div>
 
                 {/* DATA SUMMARY */}
-                <div className="flex gap-6 text-sm font-medium pl-[52px]"> {/* Padding left biar lurus sama nama unit */}
+                <div className="flex gap-6 text-sm font-medium pl-[52px]"> 
 
                   <div>
                     <span className="text-gray-500">Total :</span>{" "}
