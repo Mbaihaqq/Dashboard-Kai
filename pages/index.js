@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '../components/Layout';
+// Import Komponen
 import DetailGrafik from '../components/DetailGrafik'; 
 import DetailHazard from '../components/DetailHazard'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
 import { UploadCloud, History, Loader2 } from 'lucide-react';
-import * as XLSX from 'xlsx'; 
+import * as XLSX from 'xlsx'; // Static Import biar stabil
 
 export default function Dashboard() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export default function Dashboard() {
   // --- STATE USER & SEARCH ---
   const [userRole, setUserRole] = useState(null); 
   const [currentUserEmail, setCurrentUserEmail] = useState('');
-  const [searchTerm, setSearchTerm] = useState(''); // <--- STATE PENCARIAN
+  const [searchTerm, setSearchTerm] = useState(''); // State untuk menampung teks pencarian
 
   // --- STATE DATA ---
   const [unitsData, setUnitsData] = useState([]);
@@ -75,13 +76,14 @@ export default function Dashboard() {
     checkSession();
   }, [router]);
 
-  // --- USE EFFECT BARU: FILTERING OTOMATIS SAAT KETIK ---
+  // --- LOGIKA SEARCH / FILTERING ---
+  // Setiap kali 'searchTerm' atau 'hazardData' berubah, hitung ulang tampilan
   useEffect(() => {
-    // Jika data kosong, skip
     if (hazardData.length === 0) return;
 
-    // Filter Logic
     const lowerTerm = searchTerm.toLowerCase();
+    
+    // Filter data berdasarkan input search
     const filtered = hazardData.filter(item => {
         return (
             (item.uraian && item.uraian.toLowerCase().includes(lowerTerm)) ||
@@ -92,10 +94,11 @@ export default function Dashboard() {
         );
     });
 
-    // Hitung ulang grafik berdasarkan data yang sudah difilter
+    // Update Grafik & Angka Summary berdasarkan data yang sudah difilter
     calculateSummary(filtered);
 
-  }, [searchTerm, hazardData]); // Jalan setiap searchTerm berubah atau data baru masuk
+  }, [searchTerm, hazardData]);
+
 
   const normalizeData = (rawItem) => {
     if (!rawItem) return null;
@@ -125,15 +128,14 @@ export default function Dashboard() {
       
       const cleanData = allData.map(normalizeData).filter(Boolean);
       setHazardData(cleanData);
-      // calculateSummary dipanggil otomatis oleh useEffect di atas
+      // Note: calculateSummary tidak perlu dipanggil disini karena useEffect di atas akan mendeteksi perubahan hazardData
     } catch (error) { console.error("Error dashboard:", error.message); }
   };
 
   const calculateSummary = (data) => {
-      // Logic Summary tetap sama, tapi sekarang menerima 'data' yang bisa berupa hasil filter
       const grandTotal = data.length;
 
-      // Reset jika hasil filter 0 agar grafik kosong rapi
+      // Reset jika hasil filter 0
       if (grandTotal === 0) {
           setSummary({ open: 0, pctOpen: 0, progress: 0, pctProgress: 0, closed: 0, pctClosed: 0, total: 0 });
           setUnitsData([]);
@@ -174,7 +176,6 @@ export default function Dashboard() {
       setUnitsData(formattedUnits.sort((a, b) => a.name.localeCompare(b.name)));
   };
 
-  // ... (Sisa handler upload, unit click, dll SAMA PERSIS tidak perlu diubah) ...
   const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
   const handleUpload = async () => {
@@ -183,8 +184,6 @@ export default function Dashboard() {
     setUploadProgress(0);
 
     try {
-        const XLSX = (await import('xlsx')); 
-
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
@@ -193,6 +192,7 @@ export default function Dashboard() {
                 const sheetName = workbook.SheetNames[0];
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
+                // Validasi Header untuk mencegah file kosong/salah
                 const validRows = jsonData.filter(row => {
                     const keys = Object.keys(row);
                     return keys.length > 0 && (row['No. Pelaporan'] || row['no_pelaporan'] || row['Unit']);
@@ -202,7 +202,7 @@ export default function Dashboard() {
 
                 const formattedData = validRows.map(normalizeData).filter(Boolean);
                 const totalRows = formattedData.length;
-                const batchSize = 100;
+                const batchSize = 100; // Batch aman
 
                 for (let i = 0; i < totalRows; i += batchSize) {
                     const batch = formattedData.slice(i, i + batchSize);
@@ -213,6 +213,7 @@ export default function Dashboard() {
                     setUploadProgress(Math.round(((i + batch.length) / totalRows) * 100));
                 }
 
+                // Catat History
                 const finalUploaderName = currentUserEmail && currentUserEmail !== '' ? currentUserEmail : (userRole || 'Admin System');
                 await supabase.from('upload_history').insert({
                     admin_name: finalUploaderName, 
@@ -285,7 +286,7 @@ export default function Dashboard() {
         });
 
         setHazardData(updatedData);
-        // calculateSummary akan dipanggil otomatis oleh useEffect
+        // summary update otomatis via useEffect
         refreshDetailModal(selectedUnitName, updatedData); 
         alert("Status berhasil diperbarui!");
     } catch (error) { alert("Gagal update status: " + error.message); }
@@ -294,7 +295,7 @@ export default function Dashboard() {
   if (!isAuthorized) return <div className="h-screen bg-[#F8F9FA]"></div>;
 
   return (
-    // PASSING FUNCTION SEARCH KE LAYOUT
+    // PENTING: Props onSearch harus dikirim ke Layout
     <Layout onSearch={setSearchTerm}>
       <div className="w-full px-6 py-4">
         
@@ -314,7 +315,7 @@ export default function Dashboard() {
             )}
         </div>
 
-        {/* SUMMARY (DATA SUDAH TER-FILTER OTOMATIS) */}
+        {/* SUMMARY */}
         <div className="w-full max-w-[1050px] mr-auto bg-white rounded-[1.5rem] p-8 shadow-sm mb-12 border border-gray-100">
             <div className="flex justify-between items-start mb-8 border-b border-gray-50 pb-4">
                 <div>
@@ -324,7 +325,9 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right">
                     <span className="text-6xl font-black text-gray-800 tracking-tight">{summary.total}</span>
-                    <p className="text-sm text-gray-500 font-medium mt-1">Total Hazard {searchTerm && '(Filtered)'}</p>
+                    <p className="text-sm text-gray-500 font-medium mt-1">
+                        {searchTerm ? `Hasil Pencarian: ${summary.total}` : 'Total Hazard'}
+                    </p>
                 </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -369,7 +372,7 @@ export default function Dashboard() {
 
       </div>
 
-      {/* --- MODALS --- */}
+      {/* --- MODAL IMPORT & DETAIL DLL SAMA SEPERTI SEBELUMNYA --- */}
       {userRole === 'admin' && isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
             <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
