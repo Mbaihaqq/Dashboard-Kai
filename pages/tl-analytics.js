@@ -155,7 +155,7 @@ export default function TLAnalytics() {
                     </span>
                     {!loading && (
                         <span className="bg-blue-100 text-[#005DAA] text-xs font-bold px-3 py-1 rounded-full border border-blue-200">
-                            Total Data: {totalRowsLoaded.toLocaleString()} Baris
+                            Total Data: {totalRowsLoaded.toLocaleString()} Hazard
                         </span>
                     )}
                 </div>
@@ -172,7 +172,7 @@ export default function TLAnalytics() {
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-gray-100 pb-4 gap-4">
                 <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                     <BarChart3 size={18} />
-                    Progress Penyelesaian per Unit
+                    TL Analytics
                 </h2>
                 
                 <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
