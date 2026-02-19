@@ -6,7 +6,7 @@ import DetailGrafik from '../components/DetailGrafik';
 import DetailHazard from '../components/DetailHazard'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
-import { UploadCloud, History, Loader2 } from 'lucide-react';
+import { UploadCloud, History, Loader2, X, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx'; // Static Import biar stabil
 
 export default function Dashboard() {
@@ -77,7 +77,6 @@ export default function Dashboard() {
   }, [router]);
 
   // --- LOGIKA SEARCH / FILTERING ---
-  // Setiap kali 'searchTerm' atau 'hazardData' berubah, hitung ulang tampilan
   useEffect(() => {
     if (hazardData.length === 0) return;
 
@@ -128,7 +127,6 @@ export default function Dashboard() {
       
       const cleanData = allData.map(normalizeData).filter(Boolean);
       setHazardData(cleanData);
-      // Note: calculateSummary tidak perlu dipanggil disini karena useEffect di atas akan mendeteksi perubahan hazardData
     } catch (error) { console.error("Error dashboard:", error.message); }
   };
 
@@ -184,6 +182,9 @@ export default function Dashboard() {
     setUploadProgress(0);
 
     try {
+        // LOGIKA YANG ERROR DIHAPUS DARI SINI (const XLSX = await import...)
+        // Karena sudah di-import di paling atas file.
+
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
@@ -295,7 +296,6 @@ export default function Dashboard() {
   if (!isAuthorized) return <div className="h-screen bg-[#F8F9FA]"></div>;
 
   return (
-    // PENTING: Props onSearch harus dikirim ke Layout
     <Layout onSearch={setSearchTerm}>
       <div className="w-full px-6 py-4">
         
@@ -372,7 +372,7 @@ export default function Dashboard() {
 
       </div>
 
-      {/* --- MODAL IMPORT & DETAIL DLL SAMA SEPERTI SEBELUMNYA --- */}
+      {/* --- MODALS --- */}
       {userRole === 'admin' && isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-opacity">
             <div className="bg-white rounded-[1.5rem] w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
