@@ -102,10 +102,7 @@ export default function TLAnalytics() {
           d => d.status?.toLowerCase().trim() === 'work in progress'
         ).length;
 
-        const completion =
-          total > 0
-            ? Math.round((closed / total) * 100)
-            : 0;
+        const completion = total > 0 ? Math.floor((closed / total) * 100) : 0;
 
         return {
           name: unitName,

@@ -6,21 +6,31 @@ import DetailGrafik from '../components/DetailGrafik';
 import DetailHazard from '../components/DetailHazard'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
-import { UploadCloud, History, Loader2, X, FileSpreadsheet } from 'lucide-react';
-import * as XLSX from 'xlsx'; // Static Import biar stabil
+import { UploadCloud, X, FileSpreadsheet, History, Loader2 } from 'lucide-react';
+
+// --- FIX: IMPORT DI SINI AGAR TIDAK ERROR "UNDEFINED" ---
+import * as XLSX from 'xlsx'; 
 
 export default function Dashboard() {
   const router = useRouter();
+
+  const [searchKeyword, setSearchKeyword] = useState('');
+
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const keyword = router.query.search || '';
+    setSearchKeyword(keyword.toLowerCase());
+
+  }, [router.isReady, router.query.search]);
+  
   const [isAuthorized, setIsAuthorized] = useState(false);
   
-  // --- STATE USER & SEARCH ---
-  const [userRole, setUserRole] = useState(null); 
-  const [currentUserEmail, setCurrentUserEmail] = useState('');
-  const [searchTerm, setSearchTerm] = useState(''); // State untuk menampung teks pencarian
-
   // --- STATE DATA ---
   const [unitsData, setUnitsData] = useState([]);
   const [hazardData, setHazardData] = useState([]); 
+  const [userRole, setUserRole] = useState(null); 
+  const [currentUserEmail, setCurrentUserEmail] = useState('');
 
   // --- STATE MODALS ---
   const [isModalOpen, setIsModalOpen] = useState(false); 
@@ -39,13 +49,18 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState(''); 
 
   const [summary, setSummary] = useState({ open: 0, pctOpen: 0, progress: 0, pctProgress: 0, closed: 0, pctClosed: 0, total: 0 });
+  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState(''); // <--- STATE PENCARIAN
 
-  const COLORS = { new: '#ef4444', open: '#f59e0b', progress: '#10b981', closed: '#8b5cf6', empty: '#e5e7eb' };
+  const COLORS = { new: '#ef4444', open: '#f59e0b', progress: '#8b5cf6', closed: '#10b981', empty: '#e5e7eb' };
 
+  // Helper Format Tanggal
   const formatDateTime = (date) => {
     try {
       return new Date(date).toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
-    } catch (e) { return '-'; }
+    } catch (e) {
+      return '-';
+    }
   };
 
   useEffect(() => {
@@ -59,6 +74,7 @@ export default function Dashboard() {
         setIsAuthorized(true);
         setUserRole(sessionStorage.getItem('userRole'));
 
+        // Ambil User Email
         const { data: { user } } = await supabase.auth.getUser();
         if (user && user.email) setCurrentUserEmail(user.email);
 
@@ -74,15 +90,14 @@ export default function Dashboard() {
     };
 
     checkSession();
-  }, [router]);
+  }, [router, searchKeyword]);
 
-  // --- LOGIKA SEARCH / FILTERING ---
+
+  // --- LOGIKA FILTERING OTOMATIS SAAT KETIK DI HEADER ---
   useEffect(() => {
     if (hazardData.length === 0) return;
 
     const lowerTerm = searchTerm.toLowerCase();
-    
-    // Filter data berdasarkan input search
     const filtered = hazardData.filter(item => {
         return (
             (item.uraian && item.uraian.toLowerCase().includes(lowerTerm)) ||
@@ -93,16 +108,31 @@ export default function Dashboard() {
         );
     });
 
-    // Update Grafik & Angka Summary berdasarkan data yang sudah difilter
     calculateSummary(filtered);
 
-  }, [searchTerm, hazardData]);
+  }, [searchTerm, hazardData]); 
 
-
+  // --- 1. NORMALISASI DATA ---
   const normalizeData = (rawItem) => {
+    const applySearchFilter = (data) => {
+      if (!searchKeyword) return data;
+
+      return data.filter(row => {
+        const keyword = searchKeyword.toLowerCase();
+        return (
+          row.no_pelaporan?.toLowerCase().includes(keyword) ||
+          row.pic?.toLowerCase().includes(keyword) ||
+          row.uraian?.toLowerCase().includes(keyword) ||
+          row.unit?.toLowerCase().includes(keyword) ||
+          row.lokasi?.toLowerCase().includes(keyword)
+        );
+      });
+    };
     if (!rawItem) return null;
     return {
+        // ID Unik (Pastikan string)
         no_pelaporan: String(rawItem['no_pelaporan'] || rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['report_no'] || `UNKNOWN-${Math.random()}`),
+        
         tanggal_hazard: rawItem['tanggal_hazard'] || rawItem['Tanggal Hazard'] || rawItem['Tanggal'] || null,
         unit: rawItem['unit'] || rawItem['Unit'] || 'Unknown',
         uraian: rawItem['uraian'] || rawItem['Uraian'] || rawItem['Uraian Hazard'] || '-',
@@ -126,19 +156,32 @@ export default function Dashboard() {
       }
       
       const cleanData = allData.map(normalizeData).filter(Boolean);
-      setHazardData(cleanData);
+
+      const filteredData = cleanData.filter(row => {
+        if(!searchKeyword) return true;
+        const keyword = searchKeyword.toLowerCase();
+        return (
+          row.no_pelaporan?.toLowerCase().includes(keyword) ||
+          row.pic?.toLowerCase().includes(keyword) ||
+          row.uraian?.toLowerCase().includes(keyword) ||
+          row.unit?.toLowerCase().includes(keyword) ||
+          row.lokasi?.toLowerCase().includes(keyword)
+        );
+      });
+
+      setHazardData(filteredData);
+      calculateSummary(filteredData);
     } catch (error) { console.error("Error dashboard:", error.message); }
   };
 
   const calculateSummary = (data) => {
-      const grandTotal = data.length;
-
-      // Reset jika hasil filter 0
-      if (grandTotal === 0) {
+      if (!data || data.length === 0) {
           setSummary({ open: 0, pctOpen: 0, progress: 0, pctProgress: 0, closed: 0, pctClosed: 0, total: 0 });
           setUnitsData([]);
           return;
       }
+      
+      const grandTotal = data.length;
 
       const tOpen = data.filter(d => d.status === 'Open').length;
       const tProg = data.filter(d => d.status === 'Work In Progress').length;
@@ -160,7 +203,7 @@ export default function Dashboard() {
         const progress = unitItems.filter(d => d.status === 'Work In Progress').length;
         const open = unitItems.filter(d => d.status === 'Open').length;
         
-        const completion = total > 0 ? Math.round((closed / total) * 100) : 0;
+        const completion = total > 0 ? Math.floor((closed / total) * 100) : 0;
 
         return {
           name: unitName, total, completion,
@@ -176,41 +219,50 @@ export default function Dashboard() {
 
   const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
+  // --- HANDLER UPLOAD ---
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
-        // LOGIKA YANG ERROR DIHAPUS DARI SINI (const XLSX = await import...)
-        // Karena sudah di-import di paling atas file.
-
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
                 const data = new Uint8Array(e.target.result);
+                // Baca Workbook
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-                // Validasi Header untuk mencegah file kosong/salah
+                // Filter Baris Kosong (Mencegah Crash)
                 const validRows = jsonData.filter(row => {
                     const keys = Object.keys(row);
+                    // Minimal punya salah satu kolom utama
                     return keys.length > 0 && (row['No. Pelaporan'] || row['no_pelaporan'] || row['Unit']);
                 });
 
-                if (validRows.length === 0) throw new Error("File Excel kosong atau header tidak sesuai!");
+                if (validRows.length === 0) {
+                    throw new Error("File Excel kosong atau header tidak sesuai!");
+                }
 
                 const formattedData = validRows.map(normalizeData).filter(Boolean);
                 const totalRows = formattedData.length;
-                const batchSize = 100; // Batch aman
+                const batchSize = 100; // Batch kecil agar aman memori
 
+                // Upload Batching Loop
                 for (let i = 0; i < totalRows; i += batchSize) {
                     const batch = formattedData.slice(i, i + batchSize);
+                    
+                    // Gunakan try-catch di dalam loop agar stabil
                     try {
                         const { error } = await supabase.from('hazards').upsert(batch, { onConflict: 'no_pelaporan' });
                         if (error) throw error;
-                    } catch (batchErr) { console.warn("Batch error:", batchErr.message); }
+                    } catch (batchErr) {
+                        console.warn("Batch error (skip):", batchErr.message);
+                    }
+                    
+                    // Hitung Progress
                     setUploadProgress(Math.round(((i + batch.length) / totalRows) * 100));
                 }
 
@@ -222,6 +274,7 @@ export default function Dashboard() {
                     total_rows: totalRows
                 });
 
+                // Selesai
                 const now = formatDateTime(new Date());
                 setLastUpdate(now); 
                 localStorage.setItem('last_update_fixed', now); 
@@ -253,17 +306,41 @@ export default function Dashboard() {
     setIsDetailModalOpen(true);
   };
 
+  // --- PERBAIKAN LOGIKA MODAL (APPLY SEARCH FILTER) ---
   const refreshDetailModal = (unitName, currentData) => {
-    const unitRows = currentData.filter(item => item.unit?.trim() === unitName);
+    // 1. Ambil data spesifik unit ini
+    let unitRows = currentData.filter(item => item.unit?.trim() === unitName);
+
+    // 2. Terapkan logika pencarian (Search Bar di Header) jika ada isinya
+    if (searchTerm) {
+        const lowerTerm = searchTerm.toLowerCase();
+        unitRows = unitRows.filter(item => {
+            return (
+                (item.uraian && item.uraian.toLowerCase().includes(lowerTerm)) ||
+                (item.unit && item.unit.toLowerCase().includes(lowerTerm)) ||
+                (item.lokasi && item.lokasi.toLowerCase().includes(lowerTerm)) ||
+                (item.no_pelaporan && item.no_pelaporan.toLowerCase().includes(lowerTerm)) ||
+                (item.pic && item.pic.toLowerCase().includes(lowerTerm))
+            );
+        });
+    }
+
+    // 3. Filter berdasarkan Status 
     const filteredRows = unitRows.filter(row => {
+        // PENTING: Jika User sedang mencari sesuatu, jangan filter by status. 
+        // Biarkan tampil apa adanya (termasuk yang Closed) agar Hazard yg dicari pasti muncul!
+        if (searchTerm) return true; 
+
         return row.status === 'Open' || row.status === 'Work In Progress';
     });
+
     filteredRows.sort((a, b) => {
         const dateA = new Date(a.tanggal_hazard);
         const dateB = new Date(b.tanggal_hazard);
         if (!isNaN(dateA) && !isNaN(dateB)) return dateB - dateA;
         return 0;
     });
+    
     setSelectedUnitName(unitName);
     setSelectedUnitRows(filteredRows);
   };
@@ -287,7 +364,7 @@ export default function Dashboard() {
         });
 
         setHazardData(updatedData);
-        // summary update otomatis via useEffect
+        calculateSummary(updatedData);
         refreshDetailModal(selectedUnitName, updatedData); 
         alert("Status berhasil diperbarui!");
     } catch (error) { alert("Gagal update status: " + error.message); }
@@ -296,6 +373,7 @@ export default function Dashboard() {
   if (!isAuthorized) return <div className="h-screen bg-[#F8F9FA]"></div>;
 
   return (
+    // KIRIM SEARCHTERM KE LAYOUT
     <Layout onSearch={setSearchTerm}>
       <div className="w-full px-6 py-4">
         
@@ -305,10 +383,10 @@ export default function Dashboard() {
             
             {userRole === 'admin' && (
                 <div className="flex gap-3">
-                    <button onClick={() => router.push('/History')} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
-                        <History size={16} /> Riwayat Upload
-                    </button>
-                    <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm">
+                    <button 
+                        onClick={() => setIsModalOpen(true)} 
+                        className="flex items-center gap-2 bg-[#005DAA] hover:bg-blue-800 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm"
+                    >
                         <UploadCloud size={16} /> Import File
                     </button>
                 </div>
@@ -316,58 +394,86 @@ export default function Dashboard() {
         </div>
 
         {/* SUMMARY */}
-        <div className="w-full max-w-[1050px] mr-auto bg-white rounded-[1.5rem] p-8 shadow-sm mb-12 border border-gray-100">
+        <div className="w-full flex justify-center mb-12">
+          <div className="w-full max-w-[1400px] bg-white rounded-[1.5rem] p-8 shadow-sm border border-gray-100">
+
             <div className="flex justify-between items-start mb-8 border-b border-gray-50 pb-4">
-                <div>
-                    <h2 className="text-xl font-bold text-[#005DAA] mb-2">Hazard Report</h2>
-                    <span className="border border-gray-300 text-gray-500 text-xs px-3 py-1 rounded-full font-medium">KAI DAOP 4</span>
-                    <p className="text-[10px] text-gray-400 mt-2 font-medium">Last Updated : <br/> {lastUpdate}</p>
-                </div>
-                <div className="text-right">
-                    <span className="text-6xl font-black text-gray-800 tracking-tight">{summary.total}</span>
-                    <p className="text-sm text-gray-500 font-medium mt-1">
-                        {searchTerm ? `Hasil Pencarian: ${summary.total}` : 'Total Hazard'}
-                    </p>
-                </div>
+              <div>
+                <h2 className="text-xl font-bold text-[#005DAA] mb-2">Hazard Report</h2>
+
+                <span className="border border-gray-300 text-gray-500 text-xs px-3 py-1 rounded-full font-medium">
+                  KAI DAOP 4
+                </span>
+
+                <p className="text-[10px] text-gray-400 mt-2 font-medium">
+                  Last Updated : <br/> {lastUpdate}
+                </p>
+              </div>
+
+              <div className="text-right">
+                <span className="text-6xl font-black text-gray-800 tracking-tight">
+                  {summary.total}
+                </span>
+                <p className="text-sm text-gray-500 font-medium mt-1">
+                  Total Hazard
+                </p>
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                <BigGauge label="New Hazard" pct={summary.pctOpen} color={COLORS.new} />
-                <BigGauge label="Open Hazard" pct={summary.pctOpen} color={COLORS.open} />
-                <BigGauge label="In Progress" pct={summary.pctProgress} color={COLORS.progress} />
-                <BigGauge label="Close Hazard" pct={summary.pctClosed} color={COLORS.closed} />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-10">
+              <BigGauge
+                label="New Hazard"
+                pct={summary.pctOpen}
+                value={summary.open}
+                color={COLORS.new}
+              />
+
+              <BigGauge
+                label="Open Hazard"
+                pct={summary.pctOpen}
+                value={summary.open}
+                color={COLORS.open}
+              />
+
+              <BigGauge
+                label="In Progress"
+                pct={summary.pctProgress}
+                value={summary.progress}
+                color={COLORS.progress}
+              />
+
+              <BigGauge
+                label="Close Hazard"
+                pct={summary.pctClosed}
+                value={summary.closed}
+                color={COLORS.closed}
+              />
             </div>
+
+          </div>
         </div>
 
         {/* UNIT ANALYTICS */}
         <div className="w-full">
-            <h3 className="text-xl font-bold text-gray-700 mb-6 border-l-4 border-[#005DAA] pl-3">
-                Detail Unit ({unitsData.length})
-            </h3>
-            
-            {unitsData.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-12">
-                    {unitsData.map((unit, idx) => (
-                    <div key={idx} onClick={() => handleUnitClick(unit.name)} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300 cursor-pointer group relative hover:-translate-y-1">
-                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><div className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow-md">Click Details</div></div>
-                        <h4 className="text-base font-bold text-gray-700 mb-4 h-6 truncate uppercase">{unit.name}</h4>
-                        <div className="relative w-full h-40 flex justify-center items-end overflow-hidden mb-6">
-                            <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={unit.chartData} cx="50%" cy="100%" startAngle={180} endAngle={0} innerRadius={70} outerRadius={100} paddingAngle={2} dataKey="value" stroke="none">{unit.chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie></PieChart></ResponsiveContainer>
-                            <div className="absolute bottom-0 mb-2 flex flex-col items-center pointer-events-none"><span className="text-3xl font-black text-[#005DAA] leading-none">{unit.completion}%</span><span className="text-xs text-gray-400 font-bold mt-1">TL%</span></div>
-                        </div>
-                        <div className="flex justify-between items-end px-2 gap-2 pointer-events-none">
-                            <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#f59e0b] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Open</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[0].value}</span></div></div>
-                            <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#10b981] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Prog</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[1].value}</span></div></div>
-                            <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#8b5cf6] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Close</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[2].value}</span></div></div>
-                            <div className="flex gap-2 items-center border-l pl-4 border-gray-100"><div className="w-1.5 h-8 bg-gray-400 rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Total</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.total}</span></div></div>
-                        </div>
+            <h3 className="text-xl font-bold text-gray-700 mb-6 border-l-4 border-[#005DAA] pl-3">Detail Unit ({unitsData.length})</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 pb-12">
+                {unitsData.map((unit, idx) => (
+                <div key={idx} onClick={() => handleUnitClick(unit.name)} className="bg-white p-6 rounded-[1.5rem] shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300 cursor-pointer group relative hover:-translate-y-1">
+                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"><div className="bg-gray-800 text-white text-[10px] px-2 py-1 rounded shadow-md">Click Details</div></div>
+                    <h4 className="text-base font-bold text-gray-700 mb-4 h-6 truncate uppercase">{unit.name}</h4>
+                    <div className="relative w-full h-40 flex justify-center items-end overflow-hidden mb-6">
+                        <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={unit.chartData} cx="50%" cy="100%" startAngle={180} endAngle={0} innerRadius={70} outerRadius={100} paddingAngle={2} dataKey="value" stroke="none">{unit.chartData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie></PieChart></ResponsiveContainer>
+                        <div className="absolute bottom-0 mb-2 flex flex-col items-center pointer-events-none"><span className="text-3xl font-black text-[#005DAA] leading-none">{unit.completion}%</span><span className="text-xs text-gray-400 font-bold mt-1">TL%</span></div>
                     </div>
-                    ))}
+                    <div className="flex justify-between items-end px-2 gap-2 pointer-events-none">
+                        <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#f59e0b] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Open</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[0].value}</span></div></div>
+                        <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#8b5cf6] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Prog</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[1].value}</span></div></div>
+                        <div className="flex gap-2 items-center"><div className="w-1.5 h-8 bg-[#10b981] rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Close</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.chartData[2].value}</span></div></div>
+                        <div className="flex gap-2 items-center border-l pl-4 border-gray-100"><div className="w-1.5 h-8 bg-gray-400 rounded-full"></div><div><span className="text-[10px] text-gray-400 block uppercase font-bold">Total</span><span className="text-lg font-bold text-gray-800 leading-none">{unit.total}</span></div></div>
+                    </div>
                 </div>
-            ) : (
-                <div className="text-center py-20 bg-white rounded-3xl border border-gray-200 text-gray-400">
-                    <p>Tidak ada data yang cocok dengan pencarian "{searchTerm}"</p>
-                </div>
-            )}
+                ))}
+            </div>
         </div>
 
       </div>
@@ -406,7 +512,63 @@ export default function Dashboard() {
 }
 
 // KOMPONEN GAUGE BESAR
-function BigGauge({ label, pct, color }) {
-    const data = [{ value: pct, color: color }, { value: 100 - pct, color: '#e5e7eb' }];
-    return (<div className="flex flex-col items-center"><h3 className="text-md font-bold text-black mb-3">{label}</h3><div className="relative w-48 h-28 flex justify-center items-end overflow-hidden"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data} cx="50%" cy="100%" startAngle={180} endAngle={0} innerRadius={60} outerRadius={85} paddingAngle={0} dataKey="value" stroke="none"><Cell fill={data[0].color} /><Cell fill={data[1].color} /></Pie></PieChart></ResponsiveContainer><div className="absolute bottom-0 mb-2 text-center"><span className="text-xl font-bold text-gray-800">{pct}%</span></div></div></div>);
+function BigGauge({ label, pct, value, color }) {
+
+  const data = [
+    { value: pct, color: color },
+    { value: 100 - pct, color: '#3f4a53' }
+  ];
+
+  return (
+    <div className="flex flex-col items-center">
+
+      {/* Title */}
+      <h3 className="text-lg font-bold text-gray-800 mb-4">
+        {label}
+      </h3>
+
+      {/* Gauge */}
+      <div className="relative w-56 h-32 flex justify-center items-end">
+
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="100%"
+              startAngle={180}
+              endAngle={0}
+              innerRadius={70}
+              outerRadius={100}
+              dataKey="value"
+              stroke="none"
+            >
+              <Cell fill={color} />
+              <Cell fill="#3f4a53" />
+            </Pie>
+          </PieChart>
+        </ResponsiveContainer>
+
+        {/* Percent */}
+        <div className="absolute bottom-6 text-center">
+          <div className="text-lg font-bold text-gray-700">
+            {pct}%
+          </div>
+        </div>
+
+      </div>
+
+      {/* Colored line */}
+      <div
+        className="w-16 h-[3px] rounded-full mt-2"
+        style={{ backgroundColor: color }}
+      ></div>
+
+      {/* Total */}
+      <div className="text-lg font-semibold text-gray-800 mt-1">
+        {value.toLocaleString()}
+      </div>
+
+    </div>
+  );
 }
