@@ -152,7 +152,7 @@ export default function DetailGrafik({ isOpen, onClose, unitName, data, onRowCli
         {/* TABLE */}
         <div className="flex-1 overflow-auto p-6 bg-[#F8F9FA]">
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto max-h-[60vh]">
 
             <table className="w-full text-sm text-left text-black">
 
