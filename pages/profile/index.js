@@ -1,9 +1,10 @@
 // pages/profile/index.js
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router'; // <-- Tambahan Import
 import Layout from '../../components/Layout';
 import { supabase } from '../../lib/supabaseClient';
 import Cropper from 'react-easy-crop';
-import { Camera, X } from 'lucide-react';
+import { Camera, X, LogOut } from 'lucide-react'; // <-- Tambahan Ikon LogOut
 
 export default function Profile() {
   const [userData, setUserData] = useState({ 
@@ -15,6 +16,8 @@ export default function Profile() {
   const [showCropper, setShowCropper] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  const router = useRouter(); // <-- Tambahan Router
 
   useEffect(() => {
     fetchProfile();
@@ -81,10 +84,30 @@ export default function Profile() {
     }
   };
 
+  // <-- Tambahan Fungsi Logout -->
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    sessionStorage.clear();
+    router.push('/loginPage/login');
+  };
+
   return (
     <Layout>
       <div className="p-8 font-sans animate-fadeIn">
-        <h1 className="text-3xl font-bold mb-8 text-black">Profil</h1>
+        
+        {/* <-- Container Header Ditambah Flex biar sejajar kanan-kiri --> */}
+        <div className="flex justify-between items-start mb-8">
+          <h1 className="text-3xl font-bold text-black">Profil</h1>
+          
+          {/* <-- Tombol Logout --> */}
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-md transition-all text-sm tracking-wide"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
         
         <div className="flex items-center gap-6 mb-12">
           {/* FOTO PROFIL CONTAINER */}
