@@ -19,16 +19,34 @@ export default function Register() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+
+    // --- 1. VALIDASI DOMAIN EMAIL & DEVELOPER BYPASS ---
+    const emailInput = email.trim().toLowerCase();
+    const isKAI_Email = emailInput.endsWith('@kai.id');
+    
+    // GANTI EMAIL INI DENGAN EMAIL ASLI LU BUAT NGETES
+    const isDeveloperEmail = emailInput === 'Baihaqi070808@gmail.com'; 
+
+    if (!isKAI_Email && !isDeveloperEmail) {
+      alert("Registrasi Gagal: Anda harus menggunakan email resmi instansi (@kai.id)!");
+      return;
+    }
+    // ---------------------------------------------------
+
     setLoading(true);
 
     try {
-      // 1. Paksa Logout Sesi Lama (Mencegah token lama yang bikin bentrok)
+      // 2. Paksa Logout Sesi Lama
       await supabase.auth.signOut();
 
-      // 2. Daftarkan ke Supabase Auth
+      // 3. Daftarkan ke Supabase Auth dengan emailRedirectTo
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: emailInput,
         password: password,
+        options: {
+          // Ini yang bikin otomatis menyesuaikan URL Vercel atau Localhost!
+          emailRedirectTo: `${window.location.origin}/loginPage/login`, 
+        }
       });
 
       if (authError) throw authError;
@@ -36,22 +54,21 @@ export default function Register() {
       const userId = authData?.user?.id;
 
       if (userId) {
-        // 3. JEDA SINKRONISASI (2 Detik)
+        // 4. JEDA SINKRONISASI
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        // 4. Gunakan UPSERT untuk menyimpan data profil
-        // Ini akan mengupdate data jika ID sudah ada, atau buat baru jika belum ada
+        // 5. Simpan ke tabel profiles
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert(
             { 
               id: userId, 
               username: username.trim(), 
-              nip: nip.trim(), // memastikan NIP masuk
+              nip: nip.trim(), 
               position: position, 
               role: 'user'
             },
-            { onConflict: 'id' } // Solusi untuk error "duplicate key"
+            { onConflict: 'id' } 
           );
 
         if (profileError) {
@@ -60,8 +77,9 @@ export default function Register() {
         }
       }
 
-      alert("Registrasi Berhasil! Username, NIP, dan Jabatan telah terdaftar.");
-      router.push('/loginPage/login'); 
+      // 6. Arahkan ke halaman pemberitahuan cek email
+      alert("Registrasi Berhasil! Silakan cek kotak masuk email Anda untuk verifikasi akun.");
+      router.push('/loginPage/verify-email'); 
       
     } catch (error) {
       alert("Gagal Daftar: " + error.message);
@@ -157,6 +175,7 @@ export default function Register() {
         <div className="h-10 w-full bg-[#005DAA] flex-shrink-0"></div>
       </div>
 
+      {/* SEKSI KANAN: GAMBAR BACKGROUND */}
       <div className="hidden md:block w-1/2 relative h-full">
          <img src="/train-worker.jpeg" alt="Background" className="w-full h-full object-cover" />
          <div className="absolute inset-0 bg-black/30"></div>
