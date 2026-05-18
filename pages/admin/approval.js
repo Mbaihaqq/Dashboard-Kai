@@ -22,7 +22,11 @@ export default function AdminApproval() {
             .eq('status', 'pending');
             
         if (error) throw error;
-        setUsers(data || []);
+        
+        // MENYARING DATA: Hanya meloloskan user yang sudah melakukan verifikasi email
+        const verifiedUsers = (data || []).filter(user => user.email_confirmed_at !== null);
+        
+        setUsers(verifiedUsers);
     } catch (error) {
         console.error("Gagal load user:", error.message);
     } finally {
