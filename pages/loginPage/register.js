@@ -20,31 +20,20 @@ export default function Register() {
   const handleRegister = async (e) => {
     e.preventDefault();
 
-    // --- 1. VALIDASI DOMAIN EMAIL & DEVELOPER BYPASS ---
+    // Pastikan email bersih dari spasi dan huruf kecil semua
     const emailInput = email.trim().toLowerCase();
-    const isKAI_Email = emailInput.endsWith('@kai.id');
-    
-    // GANTI EMAIL INI DENGAN EMAIL ASLI LU BUAT NGETES
-    const isDeveloperEmail = emailInput === 'Baihaqi070808@gmail.com'; 
-
-    if (!isKAI_Email && !isDeveloperEmail) {
-      alert("Registrasi Gagal: Anda harus menggunakan email resmi instansi (@kai.id)!");
-      return;
-    }
-    // ---------------------------------------------------
 
     setLoading(true);
 
     try {
-      // 2. Paksa Logout Sesi Lama
+      // 1. Paksa Logout Sesi Lama
       await supabase.auth.signOut();
 
-      // 3. Daftarkan ke Supabase Auth dengan emailRedirectTo
+      // 2. Daftarkan ke Supabase Auth dengan emailRedirectTo
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: emailInput,
         password: password,
         options: {
-          // Ini yang bikin otomatis menyesuaikan URL Vercel atau Localhost!
           emailRedirectTo: `${window.location.origin}/loginPage/login`, 
         }
       });
@@ -54,10 +43,10 @@ export default function Register() {
       const userId = authData?.user?.id;
 
       if (userId) {
-        // 4. JEDA SINKRONISASI
+        // 3. JEDA SINKRONISASI
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        // 5. Simpan ke tabel profiles
+        // 4. Simpan ke tabel profiles
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert(
@@ -77,7 +66,7 @@ export default function Register() {
         }
       }
 
-      // 6. Arahkan ke halaman pemberitahuan cek email
+      // 5. Arahkan ke halaman pemberitahuan cek email
       alert("Registrasi Berhasil! Silakan cek kotak masuk email Anda untuk verifikasi akun.");
       router.push('/loginPage/verify-email'); 
       
@@ -108,7 +97,7 @@ export default function Register() {
                     <label className="block text-sm font-bold mb-1.5">Email Pegawai *</label>
                     <input 
                         required type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                        placeholder="contoh@kai.id" 
+                        placeholder="contoh@gmail.com" 
                         className="w-full border border-gray-400 rounded-lg px-4 py-2.5 focus:border-[#005DAA] focus:ring-1 focus:ring-[#005DAA] outline-none"
                     />
                 </div>
