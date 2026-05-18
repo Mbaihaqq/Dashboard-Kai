@@ -15,17 +15,30 @@ export default function AdminApproval() {
   const fetchPendingUsers = async () => {
     setLoading(true);
     try {
-        // KEMBALI KE LOGIKA ASLI: Hanya ambil yang status = 'pending'
-        const { data, error } = await supabase
+        // 1. Ambil semua user yang statusnya 'pending' dari tabel profiles
+        const { data: profilesData, error: profilesError } = await supabase
             .from('profiles')
             .select('*')
             .eq('status', 'pending');
             
-        if (error) throw error;
+        if (profilesError) throw profilesError;
+
+        // 2. TENTUKAN FILTER REAL-TIME: Cek status email langsung ke auth server Supabase
+        const verifiedUsers = [];
+
+        if (profilesData && profilesData.length > 0) {
+          for (const profile of profilesData) {
+            // Kita panggil metadata user dari auth berdasarkan ID profiles
+            const { data: authUserData } = await supabase.auth.getUser(profile.id).catch(() => ({ data: null }));
+            
+            // Jika user ditemukan dan email_confirmed_at tidak null, berarti dia SUDAH VERIFIKASI
+            if (authUserData?.user?.email_confirmed_at) {
+              verifiedUsers.push(profile);
+            }
+          }
+        }
         
-        // MENYARING DATA: Hanya meloloskan user yang sudah melakukan verifikasi email
-        const verifiedUsers = (data || []).filter(user => user.email_confirmed_at !== null);
-        
+        // Set ke state hanya user yang sudah klik link di Gmail
         setUsers(verifiedUsers);
     } catch (error) {
         console.error("Gagal load user:", error.message);
