@@ -8,7 +8,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabaseClient';
 import { UploadCloud, X, FileSpreadsheet, History, Loader2 } from 'lucide-react';
 
-// --- FIX: IMPORT DI SINI AGAR TIDAK ERROR "UNDEFINED" ---
+// FIX: IMPORT DI SINI AGAR TIDAK ERROR "UNDEFINED"
 import * as XLSX from 'xlsx'; 
 
 export default function Dashboard() {
@@ -26,13 +26,13 @@ export default function Dashboard() {
   
   const [isAuthorized, setIsAuthorized] = useState(false);
   
-  // --- STATE DATA ---
+  // STATE DATA 
   const [unitsData, setUnitsData] = useState([]);
   const [hazardData, setHazardData] = useState([]); 
   const [userRole, setUserRole] = useState(null); 
   const [currentUserEmail, setCurrentUserEmail] = useState('');
 
-  // --- STATE MODALS ---
+  // STATE MODALS
   const [isModalOpen, setIsModalOpen] = useState(false); 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false); 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false); 
@@ -50,7 +50,7 @@ export default function Dashboard() {
 
   const [summary, setSummary] = useState({ open: 0, pctOpen: 0, progress: 0, pctProgress: 0, closed: 0, pctClosed: 0, total: 0 });
   const [search, setSearch] = useState('');
-  const [searchTerm, setSearchTerm] = useState(''); // <--- STATE PENCARIAN
+  const [searchTerm, setSearchTerm] = useState(''); 
 
   const COLORS = { new: '#ef4444', open: '#f59e0b', progress: '#8b5cf6', closed: '#10b981', empty: '#e5e7eb' };
 
@@ -60,6 +60,27 @@ export default function Dashboard() {
       return new Date(date).toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
     } catch (e) {
       return '-';
+    }
+  };
+
+  // FIX: FUNGSI UNTUK MENGAMBIL TANGGAL TERBARU LANGSUNG DARI SUPABASE
+  const fetchLastUploadDate = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('upload_history')
+        .select('upload_date')
+        .order('upload_date', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setLastUpdate(formatDateTime(data[0].upload_date));
+      } else {
+        setLastUpdate('-');
+      }
+    } catch (err) {
+      console.error("Gagal mengambil tanggal update terbaru:", err.message);
     }
   };
 
@@ -79,21 +100,16 @@ export default function Dashboard() {
         if (user && user.email) setCurrentUserEmail(user.email);
 
         fetchHazardStatistics();
-
-        const savedDate = localStorage.getItem('last_update_fixed');
-        if (savedDate) setLastUpdate(savedDate);
-        else {
-            const initialDate = formatDateTime(new Date());
-            setLastUpdate(initialDate);
-            localStorage.setItem('last_update_fixed', initialDate);
-        }
+        
+        // FIX: Ambil tanggal riwayat upload langsung dari database Supabase
+        fetchLastUploadDate();
     };
 
     checkSession();
   }, [router, searchKeyword]);
 
 
-  // --- LOGIKA FILTERING OTOMATIS SAAT KETIK DI HEADER ---
+  // LOGIKA FILTERING OTOMATIS SAAT KETIK DI HEADER 
   useEffect(() => {
     if (hazardData.length === 0) return;
 
@@ -112,7 +128,7 @@ export default function Dashboard() {
 
   }, [searchTerm, hazardData]); 
 
-  // --- 1. NORMALISASI DATA ---
+  // 1. NORMALISASI DATA 
   const normalizeData = (rawItem) => {
     const applySearchFilter = (data) => {
       if (!searchKeyword) return data;
@@ -130,7 +146,6 @@ export default function Dashboard() {
     };
     if (!rawItem) return null;
     return {
-        // ID Unik (Pastikan string)
         no_pelaporan: String(rawItem['no_pelaporan'] || rawItem['No. Pelaporan'] || rawItem['No Pelaporan'] || rawItem['report_no'] || `UNKNOWN-${Math.random()}`),
         
         tanggal_hazard: rawItem['tanggal_hazard'] || rawItem['Tanggal Hazard'] || rawItem['Tanggal'] || null,
@@ -219,7 +234,7 @@ export default function Dashboard() {
 
   const handleFileChange = (e) => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); };
   
-  // --- HANDLER UPLOAD ---
+  // HANDLER UPLOAD 
   const handleUpload = async () => {
     if (!selectedFile) return;
     setIsUploading(true);
@@ -230,15 +245,15 @@ export default function Dashboard() {
         reader.onload = async (e) => {
             try {
                 const data = new Uint8Array(e.target.result);
-                // Baca Workbook
+
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-                // Filter Baris Kosong (Mencegah Crash)
+
                 const validRows = jsonData.filter(row => {
                     const keys = Object.keys(row);
-                    // Minimal punya salah satu kolom utama
+
                     return keys.length > 0 && (row['No. Pelaporan'] || row['no_pelaporan'] || row['Unit']);
                 });
 
@@ -248,13 +263,13 @@ export default function Dashboard() {
 
                 const formattedData = validRows.map(normalizeData).filter(Boolean);
                 const totalRows = formattedData.length;
-                const batchSize = 100; // Batch kecil agar aman memori
+                const batchSize = 100; 
 
-                // Upload Batching Loop
+
                 for (let i = 0; i < totalRows; i += batchSize) {
                     const batch = formattedData.slice(i, i + batchSize);
                     
-                    // Gunakan try-catch di dalam loop agar stabil
+    
                     try {
                         const { error } = await supabase.from('hazards').upsert(batch, { onConflict: 'no_pelaporan' });
                         if (error) throw error;
@@ -262,11 +277,11 @@ export default function Dashboard() {
                         console.warn("Batch error (skip):", batchErr.message);
                     }
                     
-                    // Hitung Progress
+                
                     setUploadProgress(Math.round(((i + batch.length) / totalRows) * 100));
                 }
 
-                // Catat History
+            
                 const finalUploaderName = currentUserEmail && currentUserEmail !== '' ? currentUserEmail : (userRole || 'Admin System');
                 await supabase.from('upload_history').insert({
                     admin_name: finalUploaderName, 
@@ -274,10 +289,8 @@ export default function Dashboard() {
                     total_rows: totalRows
                 });
 
-                // Selesai
-                const now = formatDateTime(new Date());
-                setLastUpdate(now); 
-                localStorage.setItem('last_update_fixed', now); 
+                // FIX: SINKRONISASI TANGGAL DATABASE SELESAI UPLOAD UNTUK SEMUA PERANGKAT
+                await fetchLastUploadDate();
                 
                 alert(`SUKSES! Berhasil memproses ${totalRows} data.`);
                 fetchHazardStatistics();
@@ -306,12 +319,12 @@ export default function Dashboard() {
     setIsDetailModalOpen(true);
   };
 
-  // --- PERBAIKAN LOGIKA MODAL (APPLY SEARCH FILTER) ---
+  // PERBAIKAN LOGIKA MODAL (APPLY SEARCH FILTER) 
   const refreshDetailModal = (unitName, currentData) => {
-    // 1. Ambil data spesifik unit ini
+
     let unitRows = currentData.filter(item => item.unit?.trim() === unitName);
 
-    // 2. Terapkan logika pencarian (Search Bar di Header) jika ada isinya
+
     if (searchTerm) {
         const lowerTerm = searchTerm.toLowerCase();
         unitRows = unitRows.filter(item => {
@@ -328,7 +341,6 @@ export default function Dashboard() {
     // 3. Filter berdasarkan Status 
     const filteredRows = unitRows.filter(row => {
         // PENTING: Jika User sedang mencari sesuatu, jangan filter by status. 
-        // Biarkan tampil apa adanya (termasuk yang Closed) agar Hazard yg dicari pasti muncul!
         if (searchTerm) return true; 
 
         return row.status === 'Open' || row.status === 'Work In Progress';
